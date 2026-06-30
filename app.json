@@ -1,0 +1,134 @@
+{
+  "expo": {
+    "name": "MyTwin",
+    "slug": "my-twin",
+    "scheme": "mytwin",
+    "version": "16.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0014"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.soulsync.mytwin",
+      "googleMobileAdsAppId": "ca-app-pub-3940256099942544~1458002511",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "يحتاج التطبيق للميكروفون للمحادثات الصوتية.",
+        "NSCameraUsageDescription": "للسماح لك بإرسال الصور إلى توأمك",
+        "NSPhotoLibraryUsageDescription": "للسماح لك بمشاركة الصور مع توأمك",
+        "NSLocationWhenInUseUsageDescription": "يستخدم الموقع لتحسين تجربة التوأم.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
+          }
+        ],
+        "GADApplicationIdentifier": "ca-app-pub-3940256099942544~1458002511"
+      }
+    },
+    "android": {
+      "package": "com.soulsync.mytwin",
+      "usesCleartextTraffic": true,
+      "googleMobileAdsAppId": "ca-app-pub-3940256099942544~3347511713",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0014"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
+        "VIBRATE",
+        "ACCESS_FINE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "POST_NOTIFICATIONS",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "com.android.vending.BILLING",
+        "com.google.android.gms.permission.AD_ID"
+      ],
+      "manifest": {
+        "application": {
+          "metaData": [
+            {
+              "android:name": "com.google.android.gms.ads.APPLICATION_ID",
+              "android:value": "ca-app-pub-3940256099942544~3347511713"
+            }
+          ]
+        }
+      }
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#7C3AED"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "react-native-google-mobile-ads",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "newArchEnabled": false,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 24
+          },
+          "ios": {
+            "newArchEnabled": false,
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#7C3AED"
+        }
+      ],
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "development"
+        }
+      ],
+      "./plugins/withGooglePlayBilling",
+      "./plugins/withAPIFix"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "b3a5e167-a18c-4ed5-b929-5e84f8356bce"
+      },
+      "cli": {
+        "appVersionSource": "local"
+      },
+      "GOOGLE_ADMOB_APP_ID_ANDROID": "ca-app-pub-3940256099942544~3347511713",
+      "GOOGLE_ADMOB_APP_ID_IOS": "ca-app-pub-3940256099942544~1458002511",
+      "REWARDED_AD_UNIT_ID_ANDROID": "ca-app-pub-3940256099942544/5224354917",
+      "REWARDED_AD_UNIT_ID_IOS": "ca-app-pub-3940256099942544/1712485313",
+      "API_BASE_URL": "https://my-twin-pro-production-b744.up.railway.app"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b5e2baa3-6015-40a5-9f31-115298d3b0c9"
+    },
+    "owner": "soulsync.9",
+    "sdkVersion": "52.0.0",
+    "jsEngine": "hermes"
+  }
+}

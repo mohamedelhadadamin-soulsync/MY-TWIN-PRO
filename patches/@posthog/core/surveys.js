@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Questions = exports.sendSurveyShownEvent = exports.sendSurveyEvent = exports.dismissedSurveyEvent = void 0;
+var _react = require("react");
+var _jsxRuntime = require("react/jsx-runtime");
+const Questions = () => null;
+exports.Questions = Questions;
+const sendSurveyShownEvent = () => {};
+exports.sendSurveyShownEvent = sendSurveyShownEvent;
+const sendSurveyEvent = () => {};
+exports.sendSurveyEvent = sendSurveyEvent;
+const dismissedSurveyEvent = () => {};
+exports.dismissedSurveyEvent = dismissedSurveyEvent;

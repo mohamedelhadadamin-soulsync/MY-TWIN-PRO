@@ -220,6 +220,7 @@ def _register_core_routes(app: FastAPI):
         "app.api.routes.sync_routes",
         "app.api.routes.consciousness_routes",
         "app.api.routes.tts",
+        "app.api.routes.stt_routes",
         "app.api.routes.awareness_score_routes",
         "app.api.routes.twin_state_routes",
         "app.api.routes.relationship_economy_routes",

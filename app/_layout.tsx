@@ -175,11 +175,7 @@ export default function RootLayout() {
       )}
 
       {/* ✅ زر "أنا هنا" تم حذفه من PresenceBubble، وسنستخدمه فقط للوعي المستمر بدون نص مزعج */}
-      {userId && !menuVisible && (
-        <Suspense fallback={null}>
-          <PresenceBubble visible />
-        </Suspense>
-      )}
+      {/* PresenceBubble removed — user requested no floating UI elements */}
       
       <ConsciousnessCard visible={showConsciousnessCard} onClose={handleCloseCard} />
     </ErrorBoundary>

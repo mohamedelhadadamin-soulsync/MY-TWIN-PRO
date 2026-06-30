@@ -103,7 +103,7 @@ export default function TwinMindCenter() {
     setRefreshing(true);
     try {
       const [avatarRes, consciousnessRes] = await Promise.all([
-        apiGet(`/api/avatar/get?user_id=${userId}`).catch(() => null) as Promise<AvatarData | null>,
+        apiGet(`/api/avatar/get?user_id=${userId}&gender=${useTwinStore.getState().twinGender || 'female'}`).catch(() => null) as Promise<AvatarData | null>,
         apiGet(`/api/consciousness/status?user_id=${userId}&lang=${lang}`).catch(() => null) as Promise<ConsciousnessStatus | null>,
       ]);
 

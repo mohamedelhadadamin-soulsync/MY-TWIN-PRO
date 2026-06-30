@@ -7,8 +7,8 @@ import { router } from 'expo-router';
 import {
   Send, X, Camera, Image as ImageIcon, FileText,
   Search, Cloud, Music, Film, TrendingUp,
-  Wand2, Mic, MicOff, GraduationCap, Code2, Heart,
-  Moon, PenLine, BarChart3, Home, Volume2, VolumeX,
+  Wand2, Mic, Phone, GraduationCap, Code2, Heart,
+  Moon, PenLine, BarChart3, Home,
 } from 'lucide-react-native';
 import { ToolChip } from './ChatBubbles';
 
@@ -23,12 +23,9 @@ interface ToolItem {
 }
 
 const FEATURE_ROUTES: Record<string, string> = {
-  study: '/features/study-mode',
-  code: '/features/code-lab',
-  business: '/features/business-analyzer',
-  coach: '/features/life-coach',
-  dream: '/features/dreams',
-  content: '/features/content-creator',
+  study: '/features/study-mode', code: '/features/code-lab',
+  business: '/features/business-analyzer', coach: '/features/life-coach',
+  dream: '/features/dreams', content: '/features/content-creator',
   smart_home: '/features/smart-home',
 };
 
@@ -37,25 +34,20 @@ export const ChatInput = memo(({
   onSend, onAddTool, activeTools, onRemoveTool,
   onCamera, onGallery, onFile,
   showAttach, setShowAttach, attachAnim,
-  isRecording = false, onMicPress,
-  onFeatureSelect, voiceEnabled, toggleSound,
+  isRecording = false, onMicPress, onCallPress,
   bottomInset = 0,
 }: any) => {
   const inputRef = useRef<TextInput>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const [inputHeight, setInputHeight] = React.useState(40);
+  const [inputHeight, setInputHeight] = React.useState(44);
 
   useEffect(() => {
     if (isRecording) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.2, duration: 500, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
+      Animated.loop(Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 400, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ])).start();
+    } else { pulseAnim.setValue(1); }
   }, [isRecording]);
 
   const unifiedMenu: ToolItem[] = useMemo(() => [
@@ -79,105 +71,108 @@ export const ChatInput = memo(({
 
   const handleToolSelect = (item: ToolItem) => {
     setShowAttach(false);
-    if (item.category === 'attach' && item.onPress) {
-      item.onPress();
-    } else if (item.category === 'tool' && onAddTool) {
-      onAddTool({ type: item.id, label: lang === 'ar' ? item.label_ar : item.label_en, icon: item.icon, color: item.color });
-    } else if (item.category === 'feature') {
+    if (item.category === 'attach' && item.onPress) { item.onPress(); }
+    else if (item.category === 'tool' && onAddTool) { onAddTool({ type: item.id, label: lang === 'ar' ? item.label_ar : item.label_en, icon: item.icon, color: item.color }); }
+    else if (item.category === 'feature') {
       const route = FEATURE_ROUTES[item.id];
-      if (route) {
-        try { router.push(route as any); } catch (e) {}
-      } else if (onFeatureSelect) {
-        onFeatureSelect(item.id);
-      }
+      if (route) { try { router.push(route as any); } catch (e) {} }
+      else if (onFeatureSelect) { onFeatureSelect(item.id); }
     }
   };
 
   const hasContent = input.trim().length > 0 || (activeTools && activeTools.length > 0);
-  const sendActiveColor = '#7C3AED';
-  const sendInactiveColor = '#C7C7CC';
 
   return (
     <>
       {activeTools && activeTools.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.chipsRow, { backgroundColor: colors.headerBg }]} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[st.chipsRow, { backgroundColor: colors.headerBg }]} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
           {activeTools.map((tool: any) => (
             <ToolChip key={tool.id} label={tool.label} icon={tool.icon} color={tool.color} onClose={() => onRemoveTool && onRemoveTool(tool.id)} />
           ))}
         </ScrollView>
       )}
 
-      <View style={[styles.inputBar, { backgroundColor: colors.headerBg, borderTopColor: colors.border, paddingBottom: Math.max(bottomInset, 8) }]}>
-        <TouchableOpacity onPress={() => setShowAttach((prev: boolean) => !prev)} style={[styles.attachBtn, { backgroundColor: colors.inputBg }]} activeOpacity={0.7}>
-          <Text style={{ fontSize: 20, color: colors.subtext, fontWeight: '300' }}>+</Text>
+      <View style={[st.inputBar, { backgroundColor: colors.headerBg, borderTopColor: colors.border, paddingBottom: Math.max(bottomInset, 8) }]}>
+        {/* ＋ المرفقات */}
+        <TouchableOpacity onPress={() => setShowAttach((prev: boolean) => !prev)} style={[st.attachBtn, { backgroundColor: colors.inputBg }]} activeOpacity={0.7}>
+          <Text style={{ fontSize: 22, color: colors.subtext, fontWeight: '300' }}>+</Text>
         </TouchableOpacity>
 
-        <View style={[styles.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+        {/* حقل الكتابة */}
+        <View style={[st.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
           <TextInput
             ref={inputRef}
-            style={[styles.textInput, isRTL && { textAlign: 'right' }, { color: colors.text, height: Math.max(40, Math.min(inputHeight, 120)) }]}
-            value={input}
-            onChangeText={setInput}
-            placeholder={lang === 'ar' ? 'اكتب رسالتك... 💬' : 'Type a message... 💬'}
+            style={[st.textInput, isRTL && { textAlign: 'right' }, { color: colors.text, height: Math.max(44, Math.min(inputHeight, 120)) }]}
+            value={input} onChangeText={setInput}
+            placeholder={lang === 'ar' ? 'اكتب رسالتك...' : 'Type a message...'}
             placeholderTextColor={colors.subtext}
-            multiline
-            maxLength={2000}
-            editable={!loading}
-            blurOnSubmit={false}
-            returnKeyType="default"
-            autoCorrect={false}
-            autoCapitalize="sentences"
+            multiline maxLength={2000} editable={!loading}
+            blurOnSubmit={false} returnKeyType="default"
+            autoCorrect={false} autoCapitalize="sentences"
             onContentSizeChange={(e) => { setInputHeight(e.nativeEvent.contentSize.height); }}
           />
-          <TouchableOpacity onPress={toggleSound} style={[styles.micBtn, voiceEnabled && { backgroundColor: '#7C3AED20' }]}>
-            {voiceEnabled ? <Volume2 size={18} stroke="#7C3AED" /> : <VolumeX size={18} stroke={colors.subtext} />}
-          </TouchableOpacity>
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <TouchableOpacity onPress={onMicPress || (() => {})} style={[styles.micBtn, isRecording && styles.micActive]}>
-              {isRecording ? <MicOff size={18} stroke="#FF3B30" /> : <Mic size={18} stroke={colors.subtext} />}
-            </TouchableOpacity>
-          </Animated.View>
         </View>
 
-        <TouchableOpacity onPress={() => onSend && onSend()} disabled={loading || !hasContent} style={[styles.sendBtn, { backgroundColor: hasContent && !loading ? sendActiveColor : sendInactiveColor, opacity: hasContent && !loading ? 1 : 0.5 }]}>
+        {/* 🎤 STT – أزرق دائري */}
+        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+          <TouchableOpacity
+            onPress={onMicPress || (() => {})}
+            style={[st.sttBtn, isRecording && st.sttActive]}
+            activeOpacity={0.7}
+          >
+            <Mic size={22} stroke={isRecording ? "#FF3B30" : "#FFFFFF"} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* 📞 محادثة صوتية */}
+        <TouchableOpacity onPress={onCallPress || (() => {})} style={[st.callBtn, { backgroundColor: colors.accent }]} activeOpacity={0.7}>
+          <Phone size={20} stroke="#FFF" />
+        </TouchableOpacity>
+
+        {/* ➤ إرسال */}
+        <TouchableOpacity
+          onPress={() => onSend && onSend()}
+          disabled={loading || !hasContent}
+          style={[st.sendBtn, { backgroundColor: hasContent && !loading ? '#7C3AED' : '#C7C7CC', opacity: hasContent && !loading ? 1 : 0.5 }]}
+        >
           {loading ? <ActivityIndicator size="small" color="#FFF" /> : <Send size={20} stroke="#FFF" />}
         </TouchableOpacity>
       </View>
 
       <Modal visible={showAttach} transparent animationType="none" onRequestClose={() => setShowAttach(false)}>
-        <View style={styles.attachOverlay}>
+        <View style={st.attachOverlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowAttach(false)} />
-          <Animated.View style={[styles.attachContainer, { backgroundColor: isDark ? '#1C1C1E' : '#FFF', transform: [{ translateY: attachAnim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }], paddingBottom: Math.max(bottomInset, 20) }]}>
-            <View style={styles.attachHeader}>
-              <Text style={[styles.attachTitle, { color: colors.text }]}>{lang === 'ar' ? 'إرفاق وأدوات' : 'Attach & Tools'}</Text>
-              <TouchableOpacity onPress={() => setShowAttach(false)} style={styles.closeBtn}><X size={22} stroke={colors.subtext} /></TouchableOpacity>
+          <Animated.View style={[st.attachContainer, { backgroundColor: isDark ? '#1C1C1E' : '#FFF', transform: [{ translateY: attachAnim.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }], paddingBottom: Math.max(bottomInset, 20) }]}>
+            <View style={st.attachHeader}>
+              <Text style={[st.attachTitle, { color: colors.text }]}>{lang === 'ar' ? 'إرفاق وأدوات' : 'Attach & Tools'}</Text>
+              <TouchableOpacity onPress={() => setShowAttach(false)} style={st.closeBtn}><X size={22} stroke={colors.subtext} /></TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={true} style={{ flexGrow: 0 }}>
-              <Text style={[styles.categoryLabel, { color: colors.subtext }]}>{lang === 'ar' ? '📎 إرفاق' : '📎 Attach'}</Text>
-              <View style={styles.attachGrid}>
+              <Text style={[st.categoryLabel, { color: colors.subtext }]}>{lang === 'ar' ? '📎 إرفاق' : '📎 Attach'}</Text>
+              <View style={st.attachGrid}>
                 {unifiedMenu.filter(i => i.category === 'attach').map((item, idx) => (
-                  <TouchableOpacity key={idx} style={[styles.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
-                    <View style={[styles.attachIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={24} stroke={item.color} /></View>
-                    <Text style={[styles.attachLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
+                  <TouchableOpacity key={idx} style={[st.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
+                    <View style={[st.attachIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={24} stroke={item.color} /></View>
+                    <Text style={[st.attachLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={[styles.categoryLabel, { color: colors.subtext }]}>{lang === 'ar' ? '🔧 أدوات' : '🔧 Tools'}</Text>
-              <View style={styles.attachGrid}>
+              <Text style={[st.categoryLabel, { color: colors.subtext }]}>{lang === 'ar' ? '🔧 أدوات' : '🔧 Tools'}</Text>
+              <View style={st.attachGrid}>
                 {unifiedMenu.filter(i => i.category === 'tool').map((item, idx) => (
-                  <TouchableOpacity key={idx} style={[styles.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
-                    <View style={[styles.attachIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={24} stroke={item.color} /></View>
-                    <Text style={[styles.attachLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
+                  <TouchableOpacity key={idx} style={[st.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
+                    <View style={[st.attachIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={24} stroke={item.color} /></View>
+                    <Text style={[st.attachLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={[styles.categoryLabel, { color: colors.subtext }]}>{lang === 'ar' ? '🚀 قدرات التوأم' : '🚀 Twin Powers'}</Text>
+              <Text style={[st.categoryLabel, { color: colors.subtext }]}>{lang === 'ar' ? '🚀 قدرات التوأم' : '🚀 Twin Powers'}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 4 }}>
                   {unifiedMenu.filter(i => i.category === 'feature').map((item, idx) => (
-                    <TouchableOpacity key={idx} style={[styles.featureItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
-                      <View style={[styles.featureIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={28} stroke={item.color} /></View>
-                      <Text style={[styles.featureLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
+                    <TouchableOpacity key={idx} style={[st.featureItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
+                      <View style={[st.featureIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={28} stroke={item.color} /></View>
+                      <Text style={[st.featureLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -190,15 +185,16 @@ export const ChatInput = memo(({
   );
 });
 
-const styles = StyleSheet.create({
+const st = StyleSheet.create({
   chipsRow: { paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
-  attachBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 24, borderWidth: 1, paddingHorizontal: 4, paddingVertical: 4 },
-  textInput: { flex: 1, paddingHorizontal: 12, paddingVertical: 8, fontSize: 16, maxHeight: 120, minHeight: 40, lineHeight: 22 },
-  micBtn: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 4 },
-  micActive: { backgroundColor: '#FF3B3015' },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, gap: 6 },
+  attachBtn: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
+  inputWrap: { flex: 1, borderRadius: 28, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 6 },
+  textInput: { flex: 1, fontSize: 16, maxHeight: 120, minHeight: 44, lineHeight: 22, paddingVertical: 8 },
+  sttBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#4A90E2', justifyContent: 'center', alignItems: 'center', shadowColor: '#4A90E2', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  sttActive: { backgroundColor: '#FF3B30' },
+  callBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
   attachOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   attachContainer: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 24, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, maxHeight: '80%' },
   attachHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },

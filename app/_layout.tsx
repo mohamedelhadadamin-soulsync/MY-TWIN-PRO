@@ -8,14 +8,12 @@ import {
 import { useTwinStore } from "../store/useTwinStore";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Sparkles } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { apiGet } from '../lib/httpClient';
 
-// ✅ تحميل المكونات الثقيلة بشكل كسول
+// لا نحتاج PresenceBubble - تم حذفه
 const SideMenu = lazy(() => import('../components/SideMenu'));
-const PresenceBubble = lazy(() => import('../components/PresenceBubble'));
 
-// ============================================================
-// PARTICLE FIELD (مُبسَّط)
-// ============================================================
 const EMOTION_COLORS: Record<string, string> = {
   joy: '#FFD700', sadness: '#4A90E2', neutral: '#7C3AED', fear: '#9C27B0', love: '#E91E63', anger: '#FF3B30'
 };
@@ -23,26 +21,17 @@ const EMOTION_COLORS: Record<string, string> = {
 const ParticleField = React.memo(({ emotion }: { emotion: string }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const color = EMOTION_COLORS[emotion] || EMOTION_COLORS.neutral;
-
   useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.08, duration: 3000, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.02, duration: 3000, useNativeDriver: true })
-      ])
-    );
+    const pulse = Animated.loop(Animated.sequence([
+      Animated.timing(opacity, { toValue: 0.08, duration: 3000, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 0.02, duration: 3000, useNativeDriver: true })
+    ]));
     pulse.start();
     return () => pulse.stop();
   }, [emotion]);
-
-  return (
-    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color, opacity }]} pointerEvents="none" />
-  );
+  return <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color, opacity }]} pointerEvents="none" />;
 });
 
-// ============================================================
-// CONSCIOUSNESS CARD (مُحسَّنة)
-// ============================================================
 const ConsciousnessCard = React.memo(({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
   const router = useRouter();
   const userId = useTwinStore(s => s.userId);
@@ -81,12 +70,6 @@ const ConsciousnessCard = React.memo(({ visible, onClose }: { visible: boolean; 
   );
 });
 
-import { useRouter } from 'expo-router';
-import { apiGet } from '../lib/httpClient';
-
-// ============================================================
-// ROOT LAYOUT
-// ============================================================
 export default function RootLayout() {
   const theme = useTwinStore(s => s.theme);
   const twinEnergy = useTwinStore(s => s.twinEnergy);
@@ -101,8 +84,6 @@ export default function RootLayout() {
   const slideAnim = useRef(new Animated.Value(isRTL ? drawerWidth : -drawerWidth)).current;
   const [currentEmotion, setCurrentEmotion] = useState('neutral');
   const [showConsciousnessCard, setShowConsciousnessCard] = useState(false);
-
-  // ✅ تحسين: لا حاجة لتحميل المكونات يدويًا، React.lazy يتولى ذلك
 
   useEffect(() => {
     if (twinEnergy > 80) setCurrentEmotion('joy');
@@ -120,8 +101,8 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!userId) return;
-    const firstCheck = setTimeout(() => setShowConsciousnessCard(true), 10 * 60 * 1000); // أول فحص بعد 10 دقائق
-    const interval = setInterval(() => setShowConsciousnessCard(true), 60 * 60 * 1000); // ثم كل ساعة
+    const firstCheck = setTimeout(() => setShowConsciousnessCard(true), 10 * 60 * 1000);
+    const interval = setInterval(() => setShowConsciousnessCard(true), 60 * 60 * 1000);
     return () => { clearTimeout(firstCheck); clearInterval(interval); };
   }, [userId]);
 
@@ -132,7 +113,6 @@ export default function RootLayout() {
     <ErrorBoundary>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <ParticleField emotion={currentEmotion} />
-      
       <Stack screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 150 }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="splash" />
@@ -160,7 +140,6 @@ export default function RootLayout() {
         <Stack.Screen name="features/task-manager" />
       </Stack>
 
-      {/* القائمة الجانبية */}
       {menuVisible && (
         <Modal visible transparent animationType="none" onRequestClose={handleCloseMenu} statusBarTranslucent>
           <View style={st.overlay}>
@@ -174,9 +153,6 @@ export default function RootLayout() {
         </Modal>
       )}
 
-      {/* ✅ زر "أنا هنا" تم حذفه من PresenceBubble، وسنستخدمه فقط للوعي المستمر بدون نص مزعج */}
-      {/* PresenceBubble removed — user requested no floating UI elements */}
-      
       <ConsciousnessCard visible={showConsciousnessCard} onClose={handleCloseCard} />
     </ErrorBoundary>
   );

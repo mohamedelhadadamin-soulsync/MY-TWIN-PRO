@@ -1,22 +1,19 @@
 /**
  * iapService.ts – SoulSync MyTwin AI
- * نظام الفوترة المتكامل مع expo-iap (SDK 52)
+ * Google Play Billing v7 عبر NativeModules.BillingModule
+ * متوافق مع SDK 52 + Old Architecture + بدون مكتبات خارجية
  */
 
-import { Platform } from 'react-native';
-import {
-  fetchProducts,
-  getAvailablePurchases,
-  purchaseUpdatedListener,
-  purchaseErrorListener,
-  requestPurchase,
-  finishTransaction,
-  endConnection,
-} from 'expo-iap';
+import { Platform, NativeModules } from 'react-native';
 import { apiPost, apiGet } from './httpClient';
 
 // ================================================================
-// معرفات المنتجات – يجب أن تطابق Google Play Console بالضبط
+// BillingModule – Native Module المخصص
+// ================================================================
+const { BillingModule } = NativeModules;
+
+// ================================================================
+// معرفات المنتجات – تطابق Google Play Console و billing.py
 // ================================================================
 export const PRODUCT_IDS: Record<string, string> = {
   plus:    'mytwin_plus_monthly',
@@ -30,73 +27,49 @@ export const ALL_SKUS = Object.values(PRODUCT_IDS);
 // ================================================================
 // الحالة الداخلية
 // ================================================================
-let _isInitialized  = false;
-let _purchaseListener: { remove: () => void } | null = null;
-let _errorListener:   { remove: () => void } | null = null;
+let _initialized = false;
 
 // ================================================================
-// تهيئة IAP
+// التحقق من توفر BillingModule
+// ================================================================
+function isAvailable(): boolean {
+  if (Platform.OS !== 'android') return false;
+  if (!BillingModule) {
+    console.warn('[IAP] BillingModule not found - check plugin and build');
+    return false;
+  }
+  return true;
+}
+
+// ================================================================
+// تهيئة الاتصال بـ Google Play
 // ================================================================
 export async function initializeIAP(): Promise<boolean> {
-  if (Platform.OS !== 'android') return false;
-  if (_isInitialized) return true;
-
+  if (!isAvailable()) return false;
+  if (_initialized)   return true;
   try {
-    // fetchProducts يقوم بالتهيئة تلقائياً في معظم إصدارات expo-iap
-    try {
-      await fetchProducts({ skus: ALL_SKUS });
-    } catch (_) {
-      // فشل صامت – قد لا تدعم بعض الإصدارات التهيئة بهذه الطريقة
-    }
-
-    _purchaseListener = purchaseUpdatedListener(async (purchase: any) => {
-      if (!purchase) return;
-      try {
-        const productId = purchase?.productId || purchase?.transactionId || '';
-        if (productId) {
-          await finishTransaction({ purchase, isConsumable: false });
-        }
-        console.log('[IAP] ✅ Transaction finished:', productId);
-      } catch (err) {
-        console.warn('[IAP] finishTransaction error:', err);
-      }
-    });
-
-    _errorListener = purchaseErrorListener((error: any) => {
-      const code = error?.responseCode;
-      if (code !== undefined && code !== 1) {
-        console.error('[IAP] Purchase error:', code, error?.message);
-      }
-    });
-
-    _isInitialized = true;
-    console.log('[IAP] ✅ expo-iap initialized');
+    await BillingModule.startConnection();
+    _initialized = true;
+    console.log('[IAP] ✅ Google Play Billing v7 connected');
     return true;
-  } catch (err) {
-    console.error('[IAP] initializeIAP failed:', err);
+  } catch (err: any) {
+    console.error('[IAP] startConnection failed:', err?.message);
     return false;
   }
 }
 
 // ================================================================
-// تحميل الاشتراكات من Google Play
+// تحميل المنتجات من Google Play (للأسعار الحقيقية)
 // ================================================================
 export async function loadSubscriptionProducts(): Promise<any[]> {
-  if (Platform.OS !== 'android') return [];
+  if (!isAvailable()) return [];
   try {
-    await ensureInitialized();
-    const result = await fetchProducts({ skus: ALL_SKUS });
-    
-    // ✅ دفاعي: fetchProducts قد يعيد { products: [] } أو Product[] مباشرة
-    if (Array.isArray(result)) {
-      return result;
-    }
-    if (result && typeof result === 'object' && Array.isArray((result as any).products)) {
-      return (result as any).products;
-    }
-    return [];
-  } catch (err) {
-    console.warn('[IAP] loadSubscriptionProducts failed:', err);
+    await ensureInit();
+    const products = await BillingModule.queryProductDetails(ALL_SKUS);
+    console.log('[IAP] Products loaded:', products?.length ?? 0);
+    return products ?? [];
+  } catch (err: any) {
+    console.warn('[IAP] queryProductDetails failed:', err?.message);
     return [];
   }
 }
@@ -108,8 +81,8 @@ export async function purchaseSubscription(
   tier: string,
   userId: string,
 ): Promise<{ success: boolean; tier?: string; message?: string }> {
-  if (Platform.OS !== 'android') {
-    return { success: false, message: 'Android only' };
+  if (!isAvailable()) {
+    return { success: false, message: 'Store unavailable on this platform' };
   }
 
   const productId = PRODUCT_IDS[tier];
@@ -118,96 +91,94 @@ export async function purchaseSubscription(
   }
 
   try {
-    await ensureInitialized();
-    console.log('[IAP] Starting purchase:', productId);
+    await ensureInit();
+    console.log('[IAP] Launching billing flow:', productId);
 
-    // ✅ دفاعي: requestPurchase قد يقبل { productId } أو { sku } أو string
-    let purchase: any;
-    try {
-      purchase = await requestPurchase({ productId } as any);
-    } catch {
-      try {
-        purchase = await requestPurchase(productId as any);
-      } catch {
-        purchase = await (requestPurchase as any)({ sku: productId });
-      }
+    // فتح نافذة Google Play الأصلية
+    const purchase = await BillingModule.launchBillingFlow(productId);
+
+    if (!purchase?.purchaseToken) {
+      return { success: false, message: 'No purchase token received' };
     }
 
-    if (!purchase) {
-      return { success: false, message: 'No purchase returned' };
-    }
+    // التحقق عبر الخادم أولاً
+    const result = await verifyWithServer(productId, purchase.purchaseToken);
 
-    const token = (purchase as any).transactionId || 
-                  (purchase as any).purchaseToken || 
-                  (purchase as any).transactionReceipt || '';
-
-    if (!token) {
-      return { success: false, message: 'No purchase token' };
-    }
-
-    const result = await verifyWithServer(productId, token);
     if (result.success) {
-      updateLocalTier(tier);
+      // إقرار الشراء مع Google (إلزامي خلال 3 أيام)
       try {
-        const purchaseToFinish = Array.isArray(purchase) ? purchase[0] : purchase;
-        await finishTransaction({ purchase: purchaseToFinish, isConsumable: false });
-      } catch (_) {}
-      return { success: true, tier: result.tier };
+        await BillingModule.acknowledgePurchase(purchase.purchaseToken);
+        console.log('[IAP] ✅ Purchase acknowledged');
+      } catch (ackErr: any) {
+        // الإقرار غير الناجح لا يلغي الشراء لكن يجب إعادة المحاولة
+        console.warn('[IAP] acknowledgePurchase warning:', ackErr?.message);
+      }
+
+      updateLocalTier(tier);
+      return { success: true, tier: result.tier ?? tier };
     }
 
-    return { success: false, message: result.message ?? 'Verification failed' };
+    return { success: false, message: result.message ?? 'Server verification failed' };
 
   } catch (err: any) {
-    const code = err?.responseCode;
-    if (code === 1) {
+    const code = err?.code || err?.message || '';
+
+    // المستخدم ألغى الشراء - لا نُظهر خطأ
+    if (
+      code.includes('USER_CANCELED') ||
+      code.includes('USER_CANCELLED') ||
+      code === 'USER_CANCELED'
+    ) {
       return { success: false, message: 'cancelled' };
     }
+
     console.error('[IAP] purchaseSubscription error:', err);
     return { success: false, message: err?.message ?? 'Purchase failed' };
   }
 }
 
 // ================================================================
-// استعادة المشتريات
+// استعادة المشتريات السابقة
 // ================================================================
 export async function restorePurchases(
   userId: string,
 ): Promise<{ success: boolean; tier?: string; count: number }> {
-  if (Platform.OS !== 'android') return { success: false, count: 0 };
+  if (!isAvailable()) return { success: false, count: 0 };
 
   try {
-    await ensureInitialized();
-    const purchases = await getAvailablePurchases();
+    await ensureInit();
+    const purchases = await BillingModule.queryPurchases();
 
     if (!purchases || purchases.length === 0) {
-      console.log('[IAP] No purchases to restore');
+      console.log('[IAP] No purchases found to restore');
       return { success: false, count: 0 };
     }
 
-    console.log('[IAP] Restoring', purchases.length, 'purchases');
+    console.log('[IAP] Found', purchases.length, 'purchase(s) to restore');
     let restoredTier: string | undefined;
     let count = 0;
 
     for (const purchase of purchases) {
-      const token = (purchase as any).transactionId || 
-                    (purchase as any).purchaseToken || 
-                    (purchase as any).transactionReceipt || '';
-      const productId = (purchase as any).productId || (purchase as any).transactionId || '';
-
-      if (!token || !productId) continue;
+      // purchaseState: 1 = PURCHASED, 2 = PENDING
+      if (purchase.purchaseState !== 1) continue;
+      if (!purchase.purchaseToken || !purchase.productId) continue;
 
       const tier = Object.keys(PRODUCT_IDS).find(
-        k => PRODUCT_IDS[k] === productId
+        k => PRODUCT_IDS[k] === purchase.productId
       );
       if (!tier) continue;
 
-      const result = await verifyWithServer(productId, token);
+      const result = await verifyWithServer(purchase.productId, purchase.purchaseToken);
       if (result.success) {
         restoredTier = result.tier ?? tier;
         count++;
-        try {
-          await finishTransaction({ purchase, isConsumable: false });
-        } catch (_) {}
+
+        // إقرار المشتريات غير المُقرّة
+        if (!purchase.isAcknowledged) {
+          try {
+            await BillingModule.acknowledgePurchase(purchase.purchaseToken);
+          } catch (_) {}
+        }
       }
     }
 
@@ -231,7 +202,7 @@ export async function validateSubscriptionStatus(): Promise<{
   try {
     const result = await apiGet('/api/billing/status');
     if (result?.tier) {
-      updateLocalTier(result.tier);
+      if (result.tier !== 'free') updateLocalTier(result.tier);
       return {
         tier:      result.tier,
         isActive:  result.is_active ?? true,
@@ -245,17 +216,14 @@ export async function validateSubscriptionStatus(): Promise<{
 }
 
 // ================================================================
-// إنهاء الاتصال
+// إنهاء الاتصال (استدعِها عند unmount أو تسجيل الخروج)
 // ================================================================
 export async function disconnectIAP(): Promise<void> {
+  if (!isAvailable() || !_initialized) return;
   try {
-    _purchaseListener?.remove();
-    _errorListener?.remove();
-    _purchaseListener = null;
-    _errorListener   = null;
-    _isInitialized   = false;
-    await endConnection();
-    console.log('[IAP] Disconnected');
+    await BillingModule.endConnection();
+    _initialized = false;
+    console.log('[IAP] Connection ended');
   } catch (err) {
     console.warn('[IAP] disconnectIAP error:', err);
   }
@@ -264,11 +232,10 @@ export async function disconnectIAP(): Promise<void> {
 // ================================================================
 // دوال مساعدة داخلية
 // ================================================================
-async function ensureInitialized(): Promise<void> {
-  if (!_isInitialized) {
-    const ok = await initializeIAP();
-    if (!ok) throw new Error('expo-iap not initialized');
-  }
+async function ensureInit(): Promise<void> {
+  if (_initialized) return;
+  const ok = await initializeIAP();
+  if (!ok) throw new Error('Google Play Billing unavailable');
 }
 
 async function verifyWithServer(
@@ -292,7 +259,7 @@ function updateLocalTier(tier: string): void {
   try {
     const { useTwinStore } = require('../store/useTwinStore');
     useTwinStore.getState().setTier(tier as any);
-    console.log('[IAP] Tier updated:', tier);
+    console.log('[IAP] ✅ Local tier updated:', tier);
   } catch (err) {
     console.warn('[IAP] updateLocalTier failed:', err);
   }

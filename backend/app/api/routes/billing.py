@@ -1,249 +1,221 @@
 """
-Billing Routes v3.0 – متكاملة مع Google Play وإدارة الاشتراكات
-=================================================================
-- التحقق من إيصال الشراء (Google Play Developer API)
-- ترقية الاشتراك تلقائياً
-- إلغاء الاشتراك
-- تفاصيل الاشتراك الحالي
-- سجل المشتريات
-- تكامل مع Event Bus و Metrics
+Billing Routes v3.1 – Google Play Billing متكامل وآمن
 """
-import logging
+import logging, os, hashlib
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone, timedelta
+from app.api.dependencies.auth import get_current_user_id
 from app.infrastructure.database.supabase_client import get_db
 
 logger = logging.getLogger("billing_routes")
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
-# ============================================================
-# نماذج البيانات
-# ============================================================
-class PurchaseRequest(BaseModel):
-    product_id: str = Field(..., min_length=3, max_length=100)
-    purchase_token: str = Field(..., min_length=10)
+PACKAGE_NAME         = os.getenv("ANDROID_PACKAGE_NAME", "com.soulsync.mytwin")
+SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+IS_PRODUCTION        = os.getenv("ENVIRONMENT", "development") == "production"
 
-class SubscriptionStatus(BaseModel):
-    tier: str
-    plan_name: str
-    expires_at: Optional[str] = None
-    is_active: bool
-    features: list
-    auto_renew: bool = True
-
-# ============================================================
-# خريطة المنتجات – متطابقة مع PRODUCT_IDS في iapService.ts
-# ============================================================
-PRODUCT_ID_TO_TIER = {
-    "mytwin_plus_monthly":      {"tier": "plus",    "duration_days": 30},
-    "mytwin_premium_monthly":   {"tier": "premium", "duration_days": 30},
-    "mytwin_pro_semiannual":    {"tier": "pro",     "duration_days": 183},
-    "mytwin_yearly_annual":     {"tier": "yearly",  "duration_days": 365},
+# ✅ يطابق PRODUCT_IDS في iapService.ts بالضبط
+TIER_MAP: dict = {
+    "mytwin_plus_monthly":    {"tier": "plus",    "duration_days": 30},
+    "mytwin_premium_monthly": {"tier": "premium", "duration_days": 30},
+    "mytwin_pro_semiannual":  {"tier": "pro",     "duration_days": 183},
+    "mytwin_yearly_annual":   {"tier": "yearly",  "duration_days": 365},
 }
 
-# ============================================================
-# دوال مساعدة
-# ============================================================
-async def _get_current_user_id():
-    """للتوافق مع الكود القديم – في الإنتاج استخدم Depends(get_current_user_id)"""
-    return "test_user"
+class PurchaseRequest(BaseModel):
+    product_id:     str = Field(..., min_length=3,  max_length=60)
+    purchase_token: str = Field(..., min_length=10, max_length=1000)
 
-async def _get_user_tier():
-    return "free"
-
-# ============================================================
-# نقاط النهاية
-# ============================================================
+class RedeemRequest(BaseModel):
+    code: str = Field(..., min_length=5, max_length=50)
 
 @router.post("/verify")
 async def verify_purchase(
     body: PurchaseRequest,
-    user_id: Optional[str] = None,
+    user_id: str = Depends(get_current_user_id),
 ):
-    """
-    التحقق من إيصال الشراء (Google Play).
-    يقوم بترقية الاشتراك تلقائياً بعد التحقق.
-    """
-    # إذا لم يُرسل user_id، نبحث عنه في الطلب
-    if not user_id:
-        user_id = getattr(body, 'user_id', None) or "test_user"
+    logger.info(f"🛒 verify: user={user_id}, product={body.product_id}")
 
-    logger.info(f"🛒 Purchase: user={user_id}, product={body.product_id}")
-
-    # 1. التحقق من صحة المنتج
-    product_info = PRODUCT_ID_TO_TIER.get(body.product_id)
+    product_info = TIER_MAP.get(body.product_id)
     if not product_info:
-        # البحث الجزئي
-        for key, info in PRODUCT_ID_TO_TIER.items():
-            if key in body.product_id or body.product_id in key:
-                product_info = info
-                break
-        if not product_info:
-            raise HTTPException(400, f"معرف المنتج غير صالح: {body.product_id}")
+        raise HTTPException(400, f"معرف المنتج غير صالح: {body.product_id}")
 
-    tier = product_info["tier"]
+    tier          = product_info["tier"]
     duration_days = product_info["duration_days"]
+    token_hash    = hashlib.sha256(body.purchase_token.encode()).hexdigest()
 
-    # 2. التحقق من إيصال Google Play (محاكاة في التطوير)
-    is_valid = await _verify_google_play_receipt(body.purchase_token, body.product_id)
+    # حماية Token Replay
+    db = get_db()
+    try:
+        existing = db.table("purchase_history") \
+            .select("id, user_id") \
+            .eq("token_hash", token_hash) \
+            .execute()
+        if existing.data:
+            if existing.data[0].get("user_id") != user_id:
+                logger.warning(f"🚨 Token replay: {user_id}")
+                raise HTTPException(400, "إيصال مستخدم مسبقاً")
+            return {"success": True, "tier": tier, "message": "مفعّل مسبقاً"}
+    except HTTPException: raise
+    except Exception as e:
+        logger.warning(f"Token check error (non-fatal): {e}")
+
+    # التحقق من Google Play
+    is_valid, gp_data = await _verify_google_play(body.purchase_token, body.product_id)
     if not is_valid:
-        raise HTTPException(400, "إيصال الشراء غير صالح أو منتهي الصلاحية")
+        raise HTTPException(400, "إيصال غير صالح")
 
-    # 3. ترقية الاشتراك
-    success = await _upgrade_subscription(user_id, tier, duration_days)
+    # ترقية الاشتراك
+    from app.domain.billing.subscription_service import upgrade_subscription
+    success = await upgrade_subscription(user_id, tier, duration_days)
+    if not success:
+        raise HTTPException(500, "فشل تحديث الاشتراك")
 
-    if success:
-        # تسجيل عملية الشراء
-        try:
-            db = get_db()
-            db.table("purchase_history").insert({
-                "user_id": user_id,
-                "product_id": body.product_id,
-                "purchase_token": body.purchase_token,
-                "tier": tier,
-                "duration_days": duration_days,
-                "verified_at": datetime.now(timezone.utc).isoformat(),
-            }).execute()
-        except Exception as e:
-            logger.warning(f"Failed to record purchase: {e}")
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=duration_days)).isoformat()
 
-        # تسجيل الحدث
-        try:
-            from app.events.event_bus import emit
-            await emit({
-                "type": "subscription_activated",
-                "user_id": user_id,
-                "tier": tier,
-                "product_id": body.product_id,
-            })
-        except: pass
-
-        logger.info(f"✅ Subscription activated: {user_id} → {tier}")
-        return {
-            "success": True,
-            "tier": tier,
+    try:
+        db.table("purchase_history").insert({
+            "user_id":       user_id,
+            "product_id":    body.product_id,
+            "token_hash":    token_hash,
+            "tier":          tier,
             "duration_days": duration_days,
-            "message": "تم تفعيل الاشتراك بنجاح! 🎉",
-        }
+            "expires_at":    expires_at,
+            "verified_at":   datetime.now(timezone.utc).isoformat(),
+            "gp_order_id":   gp_data.get("orderId") if gp_data else None,
+            "environment":   "production" if IS_PRODUCTION else "sandbox",
+        }).execute()
+    except Exception as e:
+        logger.warning(f"purchase_history insert error (non-fatal): {e}")
 
-    raise HTTPException(500, "فشل ترقية الاشتراك")
+    try:
+        from app.events.event_bus import emit
+        await emit({"type": "subscription_activated", "user_id": user_id, "tier": tier})
+    except: pass
+
+    logger.info(f"✅ Subscription: {user_id} → {tier}")
+    return {"success": True, "tier": tier, "duration_days": duration_days,
+            "expires_at": expires_at, "message": "تم تفعيل الاشتراك! 🎉"}
 
 @router.get("/status")
-async def get_subscription_status(
-    user_id: str = Query("test_user"),
-):
-    """جلب حالة الاشتراك الحالية"""
-    sub = await _get_user_subscription(user_id)
+async def get_status(user_id: str = Depends(get_current_user_id)):
+    from app.domain.billing.subscription_service import get_user_subscription
+    sub  = await get_user_subscription(user_id)
+    plan = sub.get("plan", {})
+
+    expires_at   = sub.get("expires_at")
+    current_tier = sub.get("tier", "free")
+    is_expired   = False
+
+    if expires_at and current_tier != "free":
+        try:
+            exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) > exp:
+                is_expired   = True
+                current_tier = "free"
+                get_db().table("profiles").update({
+                    "tier": "free",
+                    "downgraded_at": datetime.now(timezone.utc).isoformat(),
+                }).eq("id", user_id).execute()
+        except: pass
+
     return {
-        "tier": sub.get("tier", "free"),
-        "plan_name": sub.get("plan_name", "Free"),
-        "expires_at": sub.get("expires_at"),
-        "is_active": sub.get("is_active", True),
-        "features": sub.get("features", []),
-        "messages_limit": sub.get("messages_limit", 15),
+        "tier":           current_tier,
+        "plan_name":      plan.get("name", "Free"),
+        "expires_at":     expires_at,
+        "is_active":      not is_expired,
+        "messages_limit": plan.get("messages", 15),
     }
 
 @router.get("/history")
-async def get_purchase_history(
-    user_id: str = Query("test_user"),
-    limit: int = Query(10, ge=1, le=50),
+async def get_history(
+    user_id: str = Depends(get_current_user_id),
+    limit:   int = Query(10, ge=1, le=50),
 ):
-    """سجل مشتريات المستخدم"""
     try:
-        db = get_db()
-        result = db.table("purchase_history").select("*").eq("user_id", user_id).order("verified_at", desc=True).limit(limit).execute()
+        result = get_db().table("purchase_history") \
+            .select("product_id, tier, duration_days, verified_at, expires_at, environment") \
+            .eq("user_id", user_id) \
+            .order("verified_at", desc=True) \
+            .limit(limit).execute()
         return {"purchases": result.data or []}
     except Exception as e:
         return {"purchases": [], "error": str(e)}
 
 @router.post("/cancel")
-async def cancel_subscription(
-    user_id: str = Query("test_user"),
-):
-    """إلغاء الاشتراك (يعود للمجاني عند انتهاء المدة)"""
+async def cancel_subscription(user_id: str = Depends(get_current_user_id)):
     try:
-        db = get_db()
-        db.table("profiles").update({
-            "auto_renew": False,
+        get_db().table("profiles").update({
+            "auto_renew":   False,
             "cancelled_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", user_id).execute()
-        return {"message": "تم إلغاء التجديد التلقائي. ستستمر في الاشتراك حتى نهاية المدة."}
+        return {"success": True, "message": "تم إلغاء التجديد التلقائي."}
     except Exception as e:
         raise HTTPException(500, str(e))
 
 @router.post("/redeem")
 async def redeem_code(
-    code: str = Query(..., min_length=5),
-    user_id: str = Query("test_user"),
+    body:    RedeemRequest,
+    user_id: str = Depends(get_current_user_id),
 ):
-    """استرداد كود هدية"""
+    db   = get_db()
+    code = body.code.strip().upper()
     try:
-        db = get_db()
-        gift = db.table("gift_codes").select("*").eq("code", code).eq("used", False).single().execute()
-        if not gift.data:
-            raise HTTPException(404, "الكود غير صالح أو مستخدم مسبقاً")
-        
-        tier = gift.data.get("tier", "premium")
-        days = gift.data.get("duration_days", 30)
-        
-        success = await _upgrade_subscription(user_id, tier, days)
-        if success:
-            db.table("gift_codes").update({"used": True, "used_by": user_id}).eq("id", gift.data["id"]).execute()
-            return {"message": f"تم تفعيل الكود! اشتراك {tier} لمدة {days} يوم."}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
-# ============================================================
-# التحقق من إيصال Google Play
-# ============================================================
-async def _verify_google_play_receipt(purchase_token: str, product_id: str) -> bool:
-    """
-    التحقق من إيصال Google Play.
-    في التطوير: يقبل أي رمز طوله > 10 حروف.
-    في الإنتاج: يستخدم Google Play Developer API.
-    """
-    if len(purchase_token) >= 10:
-        return True
-    return False
-
-# ============================================================
-# إدارة الاشتراكات (محاكاة – تُستبدل بـ subscription_service في الإنتاج)
-# ============================================================
-async def _upgrade_subscription(user_id: str, tier: str, duration_days: int) -> bool:
-    """ترقية اشتراك المستخدم"""
-    try:
-        db = get_db()
-        expires = (datetime.now(timezone.utc) + timedelta(days=duration_days)).isoformat()
-        db.table("profiles").update({
-            "tier": tier,
-            "subscription_expires": expires,
-            "auto_renew": True,
-        }).eq("id", user_id).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Upgrade failed: {e}")
-        return False
-
-async def _get_user_subscription(user_id: str) -> dict:
-    """جلب اشتراك المستخدم الحالي"""
-    try:
-        db = get_db()
-        result = db.table("profiles").select("tier,subscription_expires,auto_renew").eq("id", user_id).single().execute()
-        if result.data:
-            return {
-                "tier": result.data.get("tier", "free"),
-                "plan_name": result.data.get("tier", "free"),
-                "expires_at": result.data.get("subscription_expires"),
-                "is_active": True,
-                "features": [],
-                "messages_limit": 15,
-            }
+        gift = db.table("gift_codes").select("*") \
+            .eq("code", code).eq("used", False).single().execute()
     except:
-        pass
-    return {"tier": "free", "plan_name": "Free", "is_active": True}
+        raise HTTPException(404, "الكود غير صالح")
+    if not gift.data:
+        raise HTTPException(404, "الكود غير صالح أو مستخدم مسبقاً")
 
-logger.info("✅ Billing Routes v3.0 initialized")
+    tier = gift.data.get("tier", "premium")
+    days = gift.data.get("duration_days", 30)
+
+    from app.domain.billing.subscription_service import upgrade_subscription
+    if not await upgrade_subscription(user_id, tier, days):
+        raise HTTPException(500, "فشل تفعيل الكود")
+
+    db.table("gift_codes").update({
+        "used": True, "used_by": user_id,
+        "used_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", gift.data["id"]).execute()
+
+    return {"success": True, "tier": tier, "days": days,
+            "message": f"تم تفعيل الكود! اشتراك {tier} لمدة {days} يوم."}
+
+async def _verify_google_play(token: str, product_id: str):
+    if not IS_PRODUCTION:
+        logger.info("[Billing] Dev mode: bypassing verification")
+        return True, {"orderId": f"dev_{token[:8]}"}
+
+    if not SERVICE_ACCOUNT_JSON:
+        logger.error("[Billing] GOOGLE_SERVICE_ACCOUNT_JSON missing in production!")
+        return False, None
+
+    try:
+        import json
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+
+        creds = service_account.Credentials.from_service_account_info(
+            json.loads(SERVICE_ACCOUNT_JSON),
+            scopes=["https://www.googleapis.com/auth/androidpublisher"]
+        )
+        service = build("androidpublisher", "v3", credentials=creds, cache_discovery=False)
+        result  = service.purchases().subscriptions().get(
+            packageName=PACKAGE_NAME, subscriptionId=product_id, token=token
+        ).execute()
+
+        expiry_ms = int(result.get("expiryTimeMillis", 0))
+        now_ms    = int(datetime.now(timezone.utc).timestamp() * 1000)
+        ack_state = result.get("acknowledgementState", 0)
+        is_valid  = (ack_state == 1) or (expiry_ms > now_ms)
+
+        return is_valid, result
+    except Exception as e:
+        logger.error(f"[Billing] Google Play API error: {e}")
+        return False, None
+
+logger.info("✅ Billing Routes v3.1 initialized")

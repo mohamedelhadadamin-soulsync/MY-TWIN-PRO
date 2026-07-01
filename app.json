@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.soulsync.mytwin",
+      "googleMobileAdsAppId": "ca-app-pub-3940256099942544~1458002511",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "يحتاج التطبيق للميكروفون للمحادثات الصوتية.",
         "NSCameraUsageDescription": "للسماح لك بإرسال الصور إلى توأمك",
@@ -30,6 +31,8 @@
     },
     "android": {
       "package": "com.soulsync.mytwin",
+      "usesCleartextTraffic": true,
+      "googleMobileAdsAppId": "ca-app-pub-3940256099942544~3347511713",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0014"
@@ -47,7 +50,17 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "com.android.vending.BILLING",
         "com.google.android.gms.permission.AD_ID"
-      ]
+      ],
+      "manifest": {
+        "application": {
+          "metaData": [
+            {
+              "android:name": "com.google.android.gms.ads.APPLICATION_ID",
+              "android:value": "ca-app-pub-3940256099942544~3347511713"
+            }
+          ]
+        }
+      }
     },
     "notification": {
       "icon": "./assets/notification-icon.png",
@@ -64,7 +77,8 @@
             "newArchEnabled": false,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "minSdkVersion": 24
+            "minSdkVersion": 24,
+            "kotlinVersion": "1.9.24"
           },
           "ios": {
             "newArchEnabled": false,
@@ -83,6 +97,7 @@
         "onesignal-expo-plugin",
         { "mode": "development" }
       ],
+      "./plugins/withGooglePlayBilling",
       "./plugins/withAPIFix"
     ],
     "extra": {

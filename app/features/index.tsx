@@ -1,18 +1,17 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, RefreshControl, Dimensions, Animated,
+  ActivityIndicator, Dimensions, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTwinStore } from '../../store/useTwinStore';
 import { useEnergyStore } from '../../store/useEnergyStore';
 import { useTheme } from '../../utils/theme';
-import { router } from 'expo-router';
+import { router, Href } from 'expo-router';
 import {
   ArrowLeft, GraduationCap, Code2, TrendingUp, Heart,
-  ImageIcon, Moon, PenLine, Sparkles, Zap, MessageSquare,
-  Home, CheckSquare, Brain, Lightbulb, BarChart3,
-  Eye, Dumbbell, AlertCircle,
+  ImageIcon, Moon, PenLine, Zap, Home, CheckSquare,
+  Eye, Lightbulb,
 } from 'lucide-react-native';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -24,7 +23,6 @@ const T = {
     subtitle: 'ماذا يستطيع وعي توأمك أن يفعل؟',
     subdesc: 'كل قدرة هي نافذة على وعي أعمق',
     energy: 'الطاقة المتبقية',
-    projects: 'مشاريع محفوظة',
     start: 'افتح',
     loading: 'جاري تحميل القدرات...',
   },
@@ -33,7 +31,6 @@ const T = {
     subtitle: 'What can your Twin Mind do?',
     subdesc: 'Each power is a window to deeper consciousness',
     energy: 'Remaining Energy',
-    projects: 'Saved Projects',
     start: 'Open',
     loading: 'Loading powers...',
   },
@@ -47,22 +44,20 @@ const FEATURES = [
   { id: 'image_lab', icon: ImageIcon, label_ar: 'مختبر الصور', label_en: 'Image Lab', route: '/features/image-creator', color: '#8B5CF6', desc_ar: 'توليد صور بالذكاء', desc_en: 'AI image generation' },
   { id: 'dreams', icon: Moon, label_ar: 'تفسير الأحلام', label_en: 'Dreams', route: '/features/dreams', color: '#6366F1', desc_ar: 'تفسير بمدارس متعددة', desc_en: 'Multi-school interpretation' },
   { id: 'creator', icon: PenLine, label_ar: 'مُحترف الكتابة', label_en: 'Writing Pro', route: '/features/content-creator', color: '#D946EF', desc_ar: 'قصص، روايات، محتوى', desc_en: 'Stories, novels, content' },
-  { id: 'smart_home', icon: Home, label_ar: 'المنزل الذكي', label_en: 'Smart Home', route: '/features/smart-home', color: '#06B6D4', desc_ar: 'تحكم بالأجهزة', desc_en: 'Device control' },
-  { id: 'pass', icon: CheckSquare, label_ar: 'المساعد', label_en: 'P.A.S.S.', route: '/features/task-manager', color: '#F97316', desc_ar: 'مهام، تقويم، طقس', desc_en: 'Tasks, Calendar, Weather' },
+  { id: 'smart_home', icon: Home, label_ar: 'بيتك معاك', label_en: 'Home Hub', route: '/features/smart-home', color: '#06B6D4', desc_ar: 'تحكم بالأجهزة', desc_en: 'Device control' },
+  { id: 'pass', icon: CheckSquare, label_ar: 'P.A.S.S.', label_en: 'P.A.S.S.', route: '/features/task-manager', color: '#F97316', desc_ar: 'مهام، تقويم، طقس', desc_en: 'Tasks, Calendar, Weather' },
 ];
 
 export default function FeaturesHub() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { lang, getUserStats } = useTwinStore();
+  const { lang } = useTwinStore();
   const { getRemainingMessages, dailyMessageLimit } = useEnergyStore();
   const isAr = lang === 'ar';
   const isDark = theme.isDark;
   const t = T[lang] || T['ar'];
 
-  const [usageStats, setUsageStats] = useState<any>(null);
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const colors = {
@@ -75,26 +70,15 @@ export default function FeaturesHub() {
     border: isDark ? '#2D1B4D' : '#E8E8E3',
   };
 
-  const fetchStats = useCallback(async (showRefresh = false) => {
-    if (showRefresh) setRefreshing(true); else setLoadingStats(true);
-    try {
-      await getUserStats();
-      const store = useTwinStore.getState();
-      setUsageStats(store.userStats || {});
-    } catch (e) {
-      // silently ignore
-    } finally {
-      setLoadingStats(false);
-      setRefreshing(false);
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-    }
-  }, [getUserStats]);
-
   useEffect(() => {
-    fetchStats();
+    const timer = setTimeout(() => {
+      setLoading(false);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }, 300);
+    return () => clearTimeout(timer);
   }, []);
 
-  if (loadingStats) {
+  if (loading) {
     return (
       <View style={[st.root, { paddingTop: insets.top, backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={colors.accent} />
@@ -104,7 +88,6 @@ export default function FeaturesHub() {
   }
 
   const remainingEnergy = getRemainingMessages();
-  const projectsCount = 0; // could be from useProjectStore if needed
 
   return (
     <View style={[st.root, { paddingTop: insets.top, backgroundColor: colors.bg }]}>
@@ -118,11 +101,9 @@ export default function FeaturesHub() {
 
       <ScrollView
         contentContainerStyle={st.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchStats(true)} colors={[colors.accent]} />}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: fadeAnim }}>
-          {/* Hero Card */}
           <View style={[st.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[st.heroIcon, { backgroundColor: colors.accentLight }]}>
               <Eye size={36} stroke={colors.accent} />
@@ -131,21 +112,14 @@ export default function FeaturesHub() {
             <Text style={[st.heroSub, { color: colors.subtext }]}>{t.subdesc}</Text>
           </View>
 
-          {/* Stats Row */}
           <View style={[st.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={st.statItem}>
               <Zap size={20} stroke="#F59E0B" />
               <Text style={[st.statValue, { color: colors.text }]}>{remainingEnergy}/{dailyMessageLimit}</Text>
               <Text style={[st.statLabel, { color: colors.subtext }]}>{t.energy}</Text>
             </View>
-            <View style={st.statItem}>
-              <Lightbulb size={20} stroke="#10B981" />
-              <Text style={[st.statValue, { color: colors.text }]}>{usageStats?.tcma?.total_insights || 0}</Text>
-              <Text style={[st.statLabel, { color: colors.subtext }]}>{isAr ? 'استنتاجات' : 'Insights'}</Text>
-            </View>
           </View>
 
-          {/* Features Grid */}
           <View style={st.grid}>
             {FEATURES.map((feature) => {
               const Icon = feature.icon;
@@ -153,7 +127,7 @@ export default function FeaturesHub() {
                 <TouchableOpacity
                   key={feature.id}
                   style={[st.card, { backgroundColor: colors.card, borderColor: colors.border, width: CARD_WIDTH }]}
-                  onPress={() => router.push(feature.route as any)}
+                  onPress={() => router.push(feature.route as Href)}
                   activeOpacity={0.85}
                 >
                   <View style={[st.cardIcon, { backgroundColor: feature.color + '15' }]}>

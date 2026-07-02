@@ -1,9 +1,5 @@
 """
-Onboarding Routes v3.0 – متوافقة مع TCMA و Event Bus
-========================================================
-- تسجيل بيانات التهيئة (الاسم، اسم التوأم، الجنس)
-- تخزين تحليل الشخصية الأولي في TCMA (Reflection)
-- إرسال حدث اكتمال التهيئة
+Onboarding Routes v4.0 – تحليل شخصية متكامل مع TCMA
 """
 import logging
 from fastapi import APIRouter, Depends, HTTPException
@@ -23,6 +19,7 @@ class OnboardingBody(BaseModel):
     twinName: str = Field(..., min_length=1)
     twinGender: str = Field("female")
     freeInfo: str = Field("")
+    analysis: str = Field("")  # ✅ تحليل الشخصية
 
 @router.post("/complete")
 async def complete_onboarding(body: OnboardingBody, user_id: str = Depends(get_current_user_id)):
@@ -38,28 +35,57 @@ async def complete_onboarding(body: OnboardingBody, user_id: str = Depends(get_c
             "onboarded_at": datetime.now(timezone.utc).isoformat(),
         }).eq("id", user_id).execute()
 
-        # تخزين في TCMA
+        # ✅ تخزين تحليل الشخصية في TCMA
+        if body.analysis:
+            try:
+                from app.memory.reflection.reflection_engine import store_reflection
+                from app.memory.emotional.emotional_memory import store_emotional_memory
+                
+                # تخزين التحليل كاستنتاج
+                await store_reflection(
+                    user_id=user_id,
+                    insight_type="personality_analysis",
+                    insight_text=body.analysis[:500],
+                    confidence=0.9,
+                )
+                
+                # تخزين عاطفي لبداية الرحلة
+                await store_emotional_memory(
+                    user_id=user_id,
+                    expressed_text=f"بدأت رحلتي مع {body.twinName}",
+                    detected_emotion={"primary": "joy", "intensity": 0.9, "valence": 0.8},
+                    trigger="onboarding_completed",
+                )
+                
+                # تخزين إضافي: الأسئلة والأجوبة كسياق
+                if body.answers:
+                    answers_text = "\n".join([f"- {q}: {a}" for q, a in body.answers.items()])
+                    await store_reflection(
+                        user_id=user_id,
+                        insight_type="onboarding_answers",
+                        insight_text=f"إجابات التهيئة:\n{answers_text}"[:500],
+                        confidence=0.8,
+                    )
+            except Exception as e:
+                logger.warning(f"TCMA onboarding failed: {e}")
+
+        # تخزين في Internal State للتوأم
         try:
-            from app.memory.reflection.reflection_engine import store_reflection
-            from app.memory.emotional.emotional_memory import store_emotional_memory
-            await store_reflection(
-                user_id=user_id, insight_type="onboarding",
-                insight_text=(body.freeInfo or f"{body.userName} أكمل التهيئة")[:500], confidence=0.9
+            from app.twin_state.internal_state import twin_internal_state
+            await twin_internal_state.set_last_thought(
+                user_id,
+                f"وُلدت للتو! اسمي {body.twinName}. أنا هنا لأتعلم من {body.userName}."
             )
-            await store_emotional_memory(
-                user_id=user_id, expressed_text=f"بدأت رحلتي مع {body.twinName}",
-                detected_emotion={"primary": "joy", "intensity": 0.9, "valence": 0.8},
-                trigger="onboarding_completed"
-            )
-        except Exception as e:
-            logger.warning(f"TCMA onboarding failed: {e}")
+        except: pass
 
         # إرسال حدث
         try:
             from app.events.event_bus import emit
             await emit({
-                "type": "user_onboarded", "user_id": user_id,
-                "user_name": body.userName, "twin_name": body.twinName
+                "type": "user_onboarded",
+                "user_id": user_id,
+                "user_name": body.userName,
+                "twin_name": body.twinName,
             })
         except: pass
 
@@ -67,4 +93,4 @@ async def complete_onboarding(body: OnboardingBody, user_id: str = Depends(get_c
     except Exception as e:
         raise HTTPException(500, str(e))
 
-logger.info("✅ Onboarding Routes v3.0 initialized")
+logger.info("✅ Onboarding Routes v4.0 initialized (analysis stored in TCMA)")

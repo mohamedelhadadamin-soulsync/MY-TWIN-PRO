@@ -60,10 +60,8 @@ async def signup(body: SignupBody):
 
 @router.post("/google")
 async def google_auth(body: GoogleAuthBody):
-    """تسجيل الدخول/إنشاء حساب عبر Google"""
     db = get_db()
     try:
-        # التحقق من رمز Google والحصول على بيانات المستخدم
         import httpx
         async with httpx.AsyncClient() as client:
             resp = await client.get(
@@ -72,21 +70,38 @@ async def google_auth(body: GoogleAuthBody):
             )
             if resp.status_code != 200:
                 raise HTTPException(401, "Invalid Google token")
-            
             user_info = resp.json()
             email = user_info.get("email")
             name = user_info.get("name", "")
-            
             if not email:
                 raise HTTPException(400, "Email not provided by Google")
 
-        # محاولة تسجيل الدخول أو إنشاء حساب
+        # ✅ محاولة تسجيل الدخول ببيانات Google (OAuth)
         try:
-            # إنشاء كلمة مرور عشوائية آمنة
+            result = db.auth.sign_in_with_oauth({"provider": "google", "access_token": body.access_token})
+            if result.user and result.session:
+                user_id = result.user.id
+                # ✅ التأكد من وجود صف في profiles
+                profile = db.table("profiles").select("id").eq("id", user_id).execute()
+                if not profile.data:
+                    db.table("profiles").insert({
+                        "id": user_id, "email": email,
+                        "full_name": name or email.split('@')[0],
+                        "twin_name": body.lang == "ar" and "توأمك" or "MyTwin",
+                        "lang": body.lang, "tier": "free",
+                        "twin_energy": 100, "onboarded": False,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    }).execute()
+                else:
+                    db.table("profiles").update({"email": email, "last_active": datetime.now(timezone.utc).isoformat()}).eq("id", user_id).execute()
+                return {"token": result.session.access_token, "user_id": user_id, "is_new": False}
+        except Exception as oauth_err:
+            logger.warning(f"Google OAuth failed, trying sign up: {oauth_err}")
+
+        # ✅ إذا فشل OAuth، جرب إنشاء حساب جديد
+        try:
             import secrets, string
             random_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(20))
-            
-            # محاولة إنشاء حساب جديد
             result = db.auth.sign_up({"email": email, "password": random_password})
             if result.user:
                 db.table("profiles").insert({
@@ -99,19 +114,8 @@ async def google_auth(body: GoogleAuthBody):
                 }).execute()
                 if result.session:
                     return {"token": result.session.access_token, "user_id": result.user.id, "is_new": True}
-        except:
-            pass
-
-        # إذا كان الحساب موجوداً، سجل الدخول
-        try:
-            result = db.auth.sign_in_with_password({"email": email, "password": random_password})
-            if result.user and result.session:
-                return {"token": result.session.access_token, "user_id": result.user.id, "is_new": False}
-        except:
-            # إذا فشلت كلمة المرور العشوائية، استخدم تسجيل الدخول عبر Google مباشرة
-            result = db.auth.sign_in_with_oauth({"provider": "google", "access_token": body.access_token})
-            if result.user and result.session:
-                return {"token": result.session.access_token, "user_id": result.user.id, "is_new": False}
+        except Exception as signup_err:
+            logger.error(f"Google signup also failed: {signup_err}")
 
         raise HTTPException(500, "Google authentication failed")
     except HTTPException:
@@ -120,27 +124,4 @@ async def google_auth(body: GoogleAuthBody):
         logger.error(f"Google auth failed: {e}")
         raise HTTPException(500, str(e))
 
-logger.info("✅ Auth Routes v3.0 initialized (with Google)")
-
-@router.post("/billing/verify")
-async def verify_purchase(product_id: str, purchase_token: str, user_id: str):
-    """التحقق من إيصال الشراء (Google Play أو صفحة الهبوط)"""
-    db = get_db()
-    try:
-        # 1. التحقق من Google Play
-        # (يُضاف هنا تكامل مع Google Play Developer API)
-        
-        # 2. التحقق من صفحة الهبوط (Stripe)
-        # يُرسل purchase_token إلى Stripe للتحقق
-        
-        # 3. ترقية الاشتراك
-        from app.domain.billing.subscription_service import upgrade_subscription
-        tier_map = {"plus_monthly": "plus", "premium_monthly": "premium", "pro_semiannual": "pro", "yearly_annual": "yearly"}
-        tier = tier_map.get(product_id, "free")
-        
-        if tier != "free":
-            await upgrade_subscription(user_id, tier, 30)
-            return {"valid": True, "tier": tier}
-        return {"valid": False}
-    except Exception as e:
-        return {"valid": False, "error": str(e)}
+logger.info("✅ Auth Routes v4.0 initialized (Google Auth fixed)")

@@ -1,5 +1,5 @@
 """
-AI Gateway v3.0 – البوابة الموحدة للذكاء الاصطناعي (المرجع الوحيد)
+AI Gateway v3.1 (3 HF Keys + Voice) – البوابة الموحدة للذكاء الاصطناعي (المرجع الوحيد)
 =============================================================
 - تدمج provider_router بالكامل.
 - تدير 13 مفتاح API عبر 5 مزودين مع Load Balancer ذكي.
@@ -42,7 +42,7 @@ class APIKeyManager:
         for var in ["OPENROUTER_API_KEY", "OPENROUTER_API_KEY_2", "OPENROUTER_API_KEY_3"]:
             k = os.getenv(var, ""); 
             if k: self._keys["openrouter"].append({"key": k, "usage": 0, "failures": 0})
-        for var in ["HUGGINGFACE_API_KEY", "HUGGINGFACE_API_KEY_2"]:
+        for var in ["HUGGINGFACE_API_KEY", "HUGGINGFACE_API_KEY_2", "HUGGINGFACE_API_KEY_3"]:
             k = os.getenv(var, ""); 
             if k: self._keys["huggingface"].append({"key": k, "usage": 0, "failures": 0})
         logger.info(f"🔑 AI Gateway Keys: G={len(self._keys['gemini'])}, Gi={len(self._keys['gemini_image'])}, Gr={len(self._keys['groq'])}, O={len(self._keys['openrouter'])}, HF={len(self._keys['huggingface'])}")
@@ -126,6 +126,10 @@ TASK_ROUTING = {
     ],
     "image": [
         {"provider": "gemini_image", "model": "gemini-2.5-flash-exp-image-generation"},
+    ],
+    "voice": [
+        {"provider": "huggingface", "model": "openai/whisper-small"},
+        {"provider": "huggingface", "model": "jonatasgrosman/wav2vec2-large-xlsr-53-arabic"},
     ],
 }
 
@@ -237,4 +241,4 @@ class AIGateway:
 
 # نسخة عالمية واحدة (المرجع الوحيد)
 ai_gateway = AIGateway()
-logger.info("✅ AI Gateway v3.0 initialized (Circuit Breaker + Smart Cache + Cost Tracker)")
+logger.info("✅ AI Gateway v3.1 (3 HF Keys + Voice) initialized (Circuit Breaker + Smart Cache + Cost Tracker)")

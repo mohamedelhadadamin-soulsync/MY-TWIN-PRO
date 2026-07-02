@@ -26,7 +26,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const MENU_W = Math.min(SCREEN_W * 0.82, 340);
 
 const TIER_CONFIG: Record<string, { ar: string; en: string; color: string; bg: string; icon: any }> = {
   free:              { ar: 'مجاني',         en: 'Free',           color: '#6B7280', bg: '#F3F4F6', icon: Star     },
@@ -180,7 +179,7 @@ export default function SideMenu({ onClose }: { onClose: () => void }) {
   }, [energy, c.energyColor]);
 
   return (
-    <View style={[styles.root, { backgroundColor: c.bg, width: MENU_W }]}>
+    <View style={[styles.root, { backgroundColor: c.bg, width: "100%" }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 32 }]}>
         <View style={[styles.topRow, { flexDirection: isAr ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity onPress={() => { hapticLight(); onClose(); }} style={[styles.closeBtn, { backgroundColor: c.accentSoft }]}>

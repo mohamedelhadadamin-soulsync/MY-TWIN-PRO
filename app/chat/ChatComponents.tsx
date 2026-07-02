@@ -10,11 +10,13 @@ export const COLORS = {
     bg: '#0A0014', headerBg: '#1A1226', border: '#2D1B4D',
     text: '#FFFFFF', subtext: '#A78BFA', accent: '#A855F7',
     inputBg: '#161122', userBubble: '#1A1226', twinBubble: '#1A1226',
+    success: '#10B981',
   },
   light: {
     bg: '#FAFAF8', headerBg: '#FFFFFF', border: '#E8E8E3',
     text: '#2D2D2D', subtext: '#7C6B99', accent: '#7C3AED',
     inputBg: '#FDFDF9', userBubble: '#FFFFFF', twinBubble: '#F9F9FB',
+    success: '#10B981',
   },
 };
 
@@ -56,11 +58,9 @@ const thinkStyles = StyleSheet.create({
   text: { fontSize: 13, fontWeight: '600' },
 });
 
-// ✅ WelcomeState – اختصارات بصيغة المتكلم تجعل المستخدم يتحدث عن نفسه
 export const WelcomeState = memo(({ isDark, lang, twinName, onSuggestion }: any) => {
   const c = isDark ? COLORS.dark : COLORS.light;
 
-  // الرسائل بصيغة المتكلم – المستخدم يتحدث عن نفسه
   const suggestions = lang === 'ar' ? [
     { text: 'اليوم كان عندي يوم مليان أحداث وحابب أشاركه معاك', icon: '📅' },
     { text: 'فيه حاجة مفرحاني قوي وعايز أحكيلك عليها', icon: '😊' },

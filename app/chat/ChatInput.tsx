@@ -8,19 +8,9 @@ import {
   Send, X, Camera, Image as ImageIcon, FileText,
   Search, Cloud, Music, Film, TrendingUp,
   Wand2, Mic, Phone, GraduationCap, Code2, Heart,
-  Moon, PenLine, BarChart3, Home,
+  Moon, PenLine, BarChart3, Home, AudioLines,
 } from 'lucide-react-native';
 import { ToolChip } from './ChatBubbles';
-
-interface ToolItem {
-  id: string;
-  icon: any;
-  label_ar: string;
-  label_en: string;
-  color: string;
-  category: 'attach' | 'tool' | 'feature';
-  onPress?: () => void;
-}
 
 const FEATURE_ROUTES: Record<string, string> = {
   study: '/features/study-mode', code: '/features/code-lab',
@@ -37,9 +27,9 @@ export const ChatInput = memo(({
   isRecording = false, onMicPress, onCallPress,
   bottomInset = 0,
 }: any) => {
-  const inputRef = useRef<TextInput>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [inputHeight, setInputHeight] = React.useState(44);
+  const hasText = input.trim().length > 0;
 
   useEffect(() => {
     if (isRecording) {
@@ -50,7 +40,7 @@ export const ChatInput = memo(({
     } else { pulseAnim.setValue(1); }
   }, [isRecording]);
 
-  const unifiedMenu: ToolItem[] = useMemo(() => [
+  const unifiedMenu = useMemo(() => [
     { id: 'camera', icon: Camera, label_ar: 'كاميرا', label_en: 'Camera', color: '#8B5CF6', category: 'attach', onPress: onCamera },
     { id: 'gallery', icon: ImageIcon, label_ar: 'معرض', label_en: 'Gallery', color: '#EC4899', category: 'attach', onPress: onGallery },
     { id: 'file', icon: FileText, label_ar: 'ملف', label_en: 'File', color: '#F59E0B', category: 'attach', onPress: onFile },
@@ -69,19 +59,6 @@ export const ChatInput = memo(({
     { id: 'smart_home', icon: Home, label_ar: 'منزل ذكي', label_en: 'Smart Home', color: '#06B6D4', category: 'feature' },
   ], [onCamera, onGallery, onFile]);
 
-  const handleToolSelect = (item: ToolItem) => {
-    setShowAttach(false);
-    if (item.category === 'attach' && item.onPress) { item.onPress(); }
-    else if (item.category === 'tool' && onAddTool) { onAddTool({ type: item.id, label: lang === 'ar' ? item.label_ar : item.label_en, icon: item.icon, color: item.color }); }
-    else if (item.category === 'feature') {
-      const route = FEATURE_ROUTES[item.id];
-      if (route) { try { router.push(route as any); } catch (e) {} }
-      else if (onFeatureSelect) { onFeatureSelect(item.id); }
-    }
-  };
-
-  const hasContent = input.trim().length > 0 || (activeTools && activeTools.length > 0);
-
   return (
     <>
       {activeTools && activeTools.length > 0 && (
@@ -93,15 +70,13 @@ export const ChatInput = memo(({
       )}
 
       <View style={[st.inputBar, { backgroundColor: colors.headerBg, borderTopColor: colors.border, paddingBottom: Math.max(bottomInset, 8) }]}>
-        {/* ＋ المرفقات */}
-        <TouchableOpacity onPress={() => setShowAttach((prev: boolean) => !prev)} style={[st.attachBtn, { backgroundColor: colors.inputBg }]} activeOpacity={0.7}>
-          <Text style={{ fontSize: 22, color: colors.subtext, fontWeight: '300' }}>+</Text>
-        </TouchableOpacity>
-
-        {/* حقل الكتابة */}
         <View style={[st.inputWrap, { backgroundColor: colors.inputBg, borderColor: colors.inputBorder }]}>
+          {/* أيقونة المرفقات داخل الحقل */}
+          <TouchableOpacity onPress={() => setShowAttach((prev: boolean) => !prev)} style={st.attachBtnInner} activeOpacity={0.7}>
+            <Text style={{ fontSize: 22, color: colors.subtext, fontWeight: '300' }}>+</Text>
+          </TouchableOpacity>
+
           <TextInput
-            ref={inputRef}
             style={[st.textInput, isRTL && { textAlign: 'right' }, { color: colors.text, height: Math.max(44, Math.min(inputHeight, 120)) }]}
             value={input} onChangeText={setInput}
             placeholder={lang === 'ar' ? 'اكتب رسالتك...' : 'Type a message...'}
@@ -111,32 +86,35 @@ export const ChatInput = memo(({
             autoCorrect={false} autoCapitalize="sentences"
             onContentSizeChange={(e) => { setInputHeight(e.nativeEvent.contentSize.height); }}
           />
+
+          {/* أيقونة المحادثة الصوتية داخل الحقل */}
+          <TouchableOpacity onPress={onCallPress || (() => {})} style={st.callBtnInner}>
+            <Phone size={18} stroke={colors.subtext} />
+          </TouchableOpacity>
         </View>
 
-        {/* 🎤 STT – أزرق دائري */}
+        {/* زر الإرسال المزدوج */}
         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
           <TouchableOpacity
-            onPress={onMicPress || (() => {})}
-            style={[st.sttBtn, isRecording && st.sttActive]}
-            activeOpacity={0.7}
+            onPress={hasText ? () => onSend && onSend() : onMicPress || (() => {})}
+            disabled={loading || (!hasText && !isRecording)}
+            style={[
+              st.sendBtn,
+              {
+                backgroundColor: hasText || isRecording ? colors.accent : colors.accentLight,
+                opacity: loading ? 0.5 : 1,
+              },
+            ]}
           >
-            <Mic size={22} stroke={isRecording ? "#FF3B30" : "#FFFFFF"} />
+            {loading ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : hasText ? (
+              <Send size={20} stroke="#FFF" />
+            ) : (
+              <AudioLines size={20} stroke={isRecording ? "#FF3B30" : colors.accent} />
+            )}
           </TouchableOpacity>
         </Animated.View>
-
-        {/* 📞 محادثة صوتية */}
-        <TouchableOpacity onPress={onCallPress || (() => {})} style={[st.callBtn, { backgroundColor: colors.accent }]} activeOpacity={0.7}>
-          <Phone size={20} stroke="#FFF" />
-        </TouchableOpacity>
-
-        {/* ➤ إرسال */}
-        <TouchableOpacity
-          onPress={() => onSend && onSend()}
-          disabled={loading || !hasContent}
-          style={[st.sendBtn, { backgroundColor: hasContent && !loading ? '#7C3AED' : '#C7C7CC', opacity: hasContent && !loading ? 1 : 0.5 }]}
-        >
-          {loading ? <ActivityIndicator size="small" color="#FFF" /> : <Send size={20} stroke="#FFF" />}
-        </TouchableOpacity>
       </View>
 
       <Modal visible={showAttach} transparent animationType="none" onRequestClose={() => setShowAttach(false)}>
@@ -151,7 +129,7 @@ export const ChatInput = memo(({
               <Text style={[st.categoryLabel, { color: colors.subtext }]}>{lang === 'ar' ? '📎 إرفاق' : '📎 Attach'}</Text>
               <View style={st.attachGrid}>
                 {unifiedMenu.filter(i => i.category === 'attach').map((item, idx) => (
-                  <TouchableOpacity key={idx} style={[st.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
+                  <TouchableOpacity key={idx} style={[st.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => { setShowAttach(false); item.onPress?.(); }}>
                     <View style={[st.attachIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={24} stroke={item.color} /></View>
                     <Text style={[st.attachLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
                   </TouchableOpacity>
@@ -160,7 +138,7 @@ export const ChatInput = memo(({
               <Text style={[st.categoryLabel, { color: colors.subtext }]}>{lang === 'ar' ? '🔧 أدوات' : '🔧 Tools'}</Text>
               <View style={st.attachGrid}>
                 {unifiedMenu.filter(i => i.category === 'tool').map((item, idx) => (
-                  <TouchableOpacity key={idx} style={[st.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
+                  <TouchableOpacity key={idx} style={[st.attachItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => { setShowAttach(false); onAddTool?.({ type: item.id, label: lang === 'ar' ? item.label_ar : item.label_en, icon: item.icon, color: item.color }); }}>
                     <View style={[st.attachIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={24} stroke={item.color} /></View>
                     <Text style={[st.attachLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
                   </TouchableOpacity>
@@ -170,7 +148,7 @@ export const ChatInput = memo(({
               <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 4 }}>
                   {unifiedMenu.filter(i => i.category === 'feature').map((item, idx) => (
-                    <TouchableOpacity key={idx} style={[st.featureItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => handleToolSelect(item)}>
+                    <TouchableOpacity key={idx} style={[st.featureItem, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]} onPress={() => { setShowAttach(false); router.push(FEATURE_ROUTES[item.id] as any); }}>
                       <View style={[st.featureIconWrap, { backgroundColor: item.color + '15' }]}><item.icon size={28} stroke={item.color} /></View>
                       <Text style={[st.featureLabel, { color: colors.text }]}>{lang === 'ar' ? item.label_ar : item.label_en}</Text>
                     </TouchableOpacity>
@@ -187,14 +165,12 @@ export const ChatInput = memo(({
 
 const st = StyleSheet.create({
   chipsRow: { paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, gap: 6 },
-  attachBtn: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
-  inputWrap: { flex: 1, borderRadius: 28, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 6 },
-  textInput: { flex: 1, fontSize: 16, maxHeight: 120, minHeight: 44, lineHeight: 22, paddingVertical: 8 },
-  sttBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#4A90E2', justifyContent: 'center', alignItems: 'center', shadowColor: '#4A90E2', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  sttActive: { backgroundColor: '#FF3B30' },
-  callBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  inputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 28, borderWidth: 1, paddingHorizontal: 8 },
+  attachBtnInner: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 4 },
+  textInput: { flex: 1, fontSize: 16, maxHeight: 120, minHeight: 44, lineHeight: 22, paddingHorizontal: 4, paddingVertical: 10 },
+  callBtnInner: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
+  sendBtn: { width: 46, height: 46, borderRadius: 23, justifyContent: 'center', alignItems: 'center', shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   attachOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   attachContainer: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 24, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 8, maxHeight: '80%' },
   attachHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },

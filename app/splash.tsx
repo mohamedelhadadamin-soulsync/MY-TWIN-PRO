@@ -3,16 +3,20 @@ import {
   View, Image, Text, StyleSheet, Animated, Dimensions, StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
-import { useTwinStore } from '../store/useTwinStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../utils/theme';
 import { Audio } from 'expo-av';
 
-const SPLASH_BG = require('../assets/splash.png');
-const LOGO = require('../assets/logo.png');
+// ✅ استيراد الصور مع حماية
+let SPLASH_BG: any = null;
+let LOGO: any = null;
+try { SPLASH_BG = require('../assets/splash.png'); } catch(e) {}
+try { LOGO = require('../assets/logo.png'); } catch(e) {}
+
 const { width, height } = Dimensions.get('window');
 
 // ============================================================
-// NEURON NETWORK – خلايا عصبية ذهبية متصلة (بدون جسيمات)
+// NEURON NETWORK – خلايا عصبية ذهبية متصلة
 // ============================================================
 const NeuronNetwork = ({ isDark }: { isDark: boolean }) => {
   const neuronCount = 12;
@@ -45,7 +49,6 @@ const NeuronNetwork = ({ isDark }: { isDark: boolean }) => {
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {neurons.map((n, i) => (
         <React.Fragment key={i}>
-          {/* خطوط اتصال بين الخلايا القريبة */}
           {neurons.slice(i + 1).map((n2, j) => {
             const dx = n2.x - n.x;
             const dy = n2.y - n.y;
@@ -70,7 +73,6 @@ const NeuronNetwork = ({ isDark }: { isDark: boolean }) => {
               />
             );
           })}
-          {/* العقدة العصبية */}
           <Animated.View
             style={{
               position: 'absolute',
@@ -94,7 +96,7 @@ const NeuronNetwork = ({ isDark }: { isDark: boolean }) => {
 };
 
 // ============================================================
-// SPLASH SCREEN – متكيفة مع الوضع الداكن والفاتح
+// SPLASH SCREEN
 // ============================================================
 export default function Splash() {
   const theme = useTheme();
@@ -131,10 +133,11 @@ export default function Splash() {
       Animated.timing(byOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       try { if (soundObject) soundObject.unloadAsync().catch(() => {}); } catch (e) {}
-      const store = useTwinStore.getState();
-      router.replace(store.userId ? '/twin-mind' : '/login');
+      // ✅ قراءة userId من AsyncStorage مباشرة (بدون useTwinStore)
+      const storedUserId = await AsyncStorage.getItem('mytwin-user');
+      router.replace(storedUserId ? '/twin-mind' : '/login');
     }, 6000);
 
     return () => {
@@ -146,14 +149,18 @@ export default function Splash() {
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
       <StatusBar hidden />
-      {/* خلفية splash.png في الوضع الداكن فقط */}
-      {isDark && <Image source={SPLASH_BG} style={styles.bgImage} resizeMode="cover" />}
-      {/* شبكة عصبية ذهبية في كلا الوضعين */}
+      {isDark && SPLASH_BG && <Image source={SPLASH_BG} style={styles.bgImage} resizeMode="cover" />}
       <NeuronNetwork isDark={isDark} />
       <View style={styles.content}>
         <Animated.View style={[styles.logoWrapper, { transform: [{ scale: logoScale }], opacity: logoOpacity }]}>
           <View style={[styles.logoGlow, isDark && styles.logoGlowDark]}>
-            <Image source={LOGO} style={styles.logo} resizeMode="contain" />
+            {LOGO ? (
+              <Image source={LOGO} style={styles.logo} resizeMode="contain" />
+            ) : (
+              <View style={[styles.logo, { backgroundColor: '#7C3AED', borderRadius: 34, justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: '#FFF', fontSize: 40, fontWeight: '900' }}>MT</Text>
+              </View>
+            )}
           </View>
         </Animated.View>
         <Animated.Text style={[styles.appName, { opacity: titleOpacity, color: textColor }]}>

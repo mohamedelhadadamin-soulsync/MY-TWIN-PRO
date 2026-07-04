@@ -86,12 +86,12 @@
     ],
     "extra": {
       "router": { "origin": false },
-      "eas": { "projectId": "2a46798f-d597-4ad3-9255-258f3f84cd28" },
+      "eas": { "projectId": "6cb78668-322b-476f-ab25-4136d85f8d68" },
       "cli": { "appVersionSource": "local" }
     },
     "runtimeVersion": { "policy": "sdkVersion" },
     "updates": { "url": "https://u.expo.dev/b5e2baa3-6015-40a5-9f31-115298d3b0c9" },
-    "owner": "my.twin",
+    "owner": "soulsync.c",
     "sdkVersion": "52.0.0",
     "jsEngine": "hermes"
   }

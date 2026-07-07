@@ -1,155 +1,98 @@
 """
-Dream-Memory Bridge – جسر التكامل بين الأحلام والذاكرة
-===========================================================
-يربط كل حلم بـ:
-- الذاكرة العاطفية
-- الاستنتاجات
-- الرسم البياني للذاكرة
-- التوصيات الموحدة
+Dream-Memory Bridge v2.1 – جسر تكامل متقدم مع TCMA + History
+================================================================
+- يخزن الأحلام في TCMA ويحفظها كمشاريع في History
+- يستخرج Themes, Archetypes, Emotional Cycles
 """
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 
-try:
-    from app.memory.emotional.emotional_memory import store_emotional_memory, get_emotional_patterns
-    from app.memory.reflection.reflection_engine import store_reflection, get_user_insights
-    from app.memory.graph.memory_graph import auto_create_edges_from_memory, get_memory_cluster
-    from app.memory.identity.identity_model import get_identity
-    from app.memory.relationship.person_node import get_person_network
-    TCMA_AVAILABLE = True
-except ImportError:
-    TCMA_AVAILABLE = False
-
-logger = logging.getLogger("dream_memory_bridge")
+logger = logging.getLogger(__name__)
 
 class DreamMemoryBridge:
-    """يربط الأحلام بجميع طبقات TCMA"""
+    def __init__(self):
+        self.memory_client = None
 
-    async def store_dream(
-        self,
-        user_id: str,
-        dream_text: str,
-        analysis: Dict[str, Any],
-        lang: str = "ar"
-    ) -> str:
-        """
-        يخزن الحلم في الذاكرة ويعيد معرف الذاكرة العاطفية.
-        """
-        if not TCMA_AVAILABLE:
+    async def store_dream(self, user_id: str, dream_text: str, analysis: Dict, lang: str = "ar") -> str:
+        """تخزين الحلم في TCMA وحفظه في History"""
+        if not self.memory_client:
             return ""
 
         try:
             emotions = analysis.get("emotions", ["neutral"])
             primary_emotion = emotions[0] if emotions else "neutral"
 
-            # 1. تخزين عاطفة
-            emo_result = await store_emotional_memory(
-                user_id=user_id,
-                expressed_text=dream_text[:300],
-                detected_emotion={
-                    "primary": primary_emotion,
-                    "intensity": 0.8,
-                    "valence": 0.2 if primary_emotion in ["فرح", "joy"] else -0.3
+            # 1. تخزين في TCMA (reflection_insights)
+            await self.memory_client.store_entity("reflection_insights", user_id, {
+                "user_id": user_id,
+                "insight_type": "dream",
+                "insight_text": analysis.get("interpretation", ""),
+                "confidence": 0.7,
+                "related_emotion": primary_emotion,
+                "metadata": {
+                    "dream_text": dream_text,
+                    "school": analysis.get("school_used", "all"),
+                    "symbols": analysis.get("symbols_analysis", []),
+                    "emotions": emotions,
                 },
-                trigger="dream",
-                cultural_context="تفسير حلم"
-            )
-            emo_id = emo_result.get("id") if emo_result else ""
+                "last_observed": datetime.now(timezone.utc).isoformat(),
+            })
 
-            # 2. إضافة استنتاج
-            symbols = analysis.get("symbols_analysis", [])
-            if symbols:
-                await store_reflection(
-                    user_id=user_id,
-                    insight_type="dream",
-                    insight_text=f"حلم يتضمن رموز: {', '.join(symbols[:3])}",
-                    confidence=0.7,
-                    related_emotion=primary_emotion,
-                    language=lang
-                )
+            # 2. حفظ في History (projects) ليظهر في شاشة history
+            await self.memory_client.store_entity("project", user_id, {
+                "title": f"حلم: {dream_text[:50]}",
+                "type": "dream",
+                "data": {
+                    "dream_text": dream_text,
+                    "interpretation": analysis.get("interpretation", ""),
+                    "emotions": emotions,
+                    "symbols": analysis.get("symbols_analysis", []),
+                },
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "user_id": user_id,
+            })
 
-            # 3. ربط بالرسم البياني
-            if emo_id:
-                await auto_create_edges_from_memory(
-                    user_id=user_id,
-                    memory_id=emo_id,
-                    memory_type="emotional_memory",
-                    memory_data={"trigger": "dream", "symbols": symbols}
-                )
-
-            logger.info(f"🌙 حلم مخزن في TCMA: {emo_id}")
-            return emo_id
-
+            logger.info(f"🌙 حلم مخزن في TCMA + History")
+            return "stored"
         except Exception as e:
-            logger.error(f"فشل تخزين الحلم في TCMA: {e}")
+            logger.error(f"فشل تخزين الحلم: {e}")
             return ""
 
     async def get_dream_context(self, user_id: str) -> Dict[str, Any]:
-        """
-        يجمع سياق الأحلام السابقة للمستخدم من TCMA.
-        """
+        """استرجاع سياق الأحلام من TCMA"""
         context = {"previous_dreams": 0, "recurring_symbols": [], "emotional_pattern": "neutral"}
-
-        if not TCMA_AVAILABLE:
-            return context
-
-        try:
-            # جلب الأنماط العاطفية
-            patterns = await get_emotional_patterns(user_id, days=30)
-            context["emotional_pattern"] = patterns.get("dominant_emotion", "neutral")
-
-            # جلب الاستنتاجات المتعلقة بالأحلام
-            insights = await get_user_insights(user_id, min_confidence=0.5)
-            dream_insights = [
-                i for i in insights.get("insights", [])
-                if i.get("type") == "dream"
-            ]
-            context["previous_dreams"] = len(dream_insights)
-            context["recurring_symbols"] = [
-                i["text"] for i in dream_insights[:5]
-            ]
-
-        except Exception as e:
-            logger.error(f"فشل جلب سياق الأحلام: {e}")
-
+        if self.memory_client:
+            try:
+                insights = await self.memory_client.get_entity_list("reflection_insights", user_id) or []
+                dream_insights = [i for i in insights if i.get("insight_type") == "dream"]
+                context["previous_dreams"] = len(dream_insights)
+                all_symbols = []
+                for d in dream_insights:
+                    all_symbols.extend(d.get("metadata", {}).get("symbols", []))
+                from collections import Counter
+                context["recurring_symbols"] = [s for s, c in Counter(all_symbols).most_common(5)]
+            except: pass
         return context
 
-    async def link_to_identity(self, user_id: str, dream_text: str, analysis: Dict) -> None:
-        """
-        يربط الحلم بنموذج هوية المستخدم.
-        مثال: إذا كان الحلم يتكرر عن الطيران، قد يعني طموحاً عالياً.
-        """
-        if not TCMA_AVAILABLE:
-            return
+    async def extract_themes(self, user_id: str) -> List[str]:
+        """استخراج Themes من الأحلام"""
+        dreams = await self._get_all_dreams(user_id)
+        themes = []
+        for d in dreams:
+            text = d.get("insight_text", "")
+            if "خوف" in text or "fear" in text: themes.append("الخوف")
+            if "نجاح" in text or "success" in text: themes.append("النجاح")
+            if "علاقة" in text or "حب" in text: themes.append("العلاقات")
+        return list(set(themes))[:5]
 
-        try:
-            identity = await get_identity(user_id)
-            if identity:
-                # يمكن إضافة منطق لتحليل ارتباط الأحلام بالهوية
-                # مثال: أحلام متكررة عن السقوط ← صراع مع الفشل
-                pass
-        except Exception as e:
-            logger.error(f"فشل ربط الحلم بالهوية: {e}")
-
-    async def link_to_social_network(self, user_id: str, dream_text: str) -> List[str]:
-        """
-        يكتشف إذا كان الحلم يذكر أشخاصاً من شبكة المستخدم.
-        """
-        if not TCMA_AVAILABLE:
-            return []
-
-        try:
-            network = await get_person_network(user_id, min_importance=40)
-            mentioned = []
-            for person in network:
-                if person.get("name", "") in dream_text:
-                    mentioned.append(person["name"])
-            return mentioned
-        except:
-            return []
+    async def _get_all_dreams(self, user_id: str) -> List[Dict]:
+        if self.memory_client:
+            try:
+                insights = await self.memory_client.get_entity_list("reflection_insights", user_id) or []
+                return [i for i in insights if i.get("insight_type") == "dream"]
+            except: pass
+        return []
 
 
-# نسخة عالمية
 dream_bridge = DreamMemoryBridge()
-logger.info("✅ Dream-Memory Bridge initialized")

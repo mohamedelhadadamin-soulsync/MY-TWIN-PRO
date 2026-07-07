@@ -16,7 +16,10 @@ LIFE_COACH_KEYWORDS = ["مدرب", "حياتي", "مشكلة", "علاقتي", "
 CODE_LAB_KEYWORDS = ["كود", "برمجة", "مشروع", "معمارية", "قاعدة بيانات", "API", "React", "FastAPI"]
 STUDY_KEYWORDS = ["ادرس", "ذاكر", "شرح", "مفهوم", "رياضيات", "فيزياء", "كيمياء", "تاريخ", "جغرافيا", "درس"]
 CREATOR_KEYWORDS = ["اكتب", "مقال", "قصة", "رواية", "إعلان", "منشور", "كتاب", "محتوى", "سكريبت"]
+DREAM_KEYWORDS = ["حلم", "حلمت", "تفسير حلم", "رؤيا", "منام", "dream", "nightmare", "كابوس", " interpret"]
+DREAM_KEYWORDS = ["حلم", "حلمت", "تفسير حلم", "رؤيا", "منام", "dream", "nightmare", "كابوس", " interpret"]
 DREAM_KEYWORDS = ["حلم", "حلمت", "تفسير حلم", "رؤيا", "منام", "dream", "nightmare", "كابوس"]
+PASS_KEYWORDS = ["مهمة", "مهام", "طقس", "أخبار", "يوتيوب", "فيديو", "weather", "news", "youtube", "task", "reminder", "تذكير", "أنشئ مهمة", "جدول"]
 PASS_KEYWORDS = ["مهمة", "مهام", "طقس", "أخبار", "يوتيوب", "فيديو", "weather", "news", "youtube", "task", "reminder", "تذكير"]
 IMAGE_KEYWORDS = ["صورة", "ارسم", "توليد", "تصميم", "جرافيك", "بصري", "image", "generate", "draw", "design", "art"]
 SMART_HOME_KEYWORDS = ["شغل", "اطفئ", "نور", "مكيف", "منزل", "غرفة", "إضاءة", "light", "ac", "home"]
@@ -45,6 +48,15 @@ async def chat(req: ChatRequest):
             result = await pass_assistant.create_task(req.user_id, message, "", "medium")
             reply = f"تم إنشاء المهمة: {result.get('task', {}).get('title', '')}"
             provider = "pass"
+        if any(kw in message for kw in PASS_KEYWORDS):
+            try:
+                from app.features.task_manager.pass_orchestrator import pass_assistant
+                if "طقس" in message or "weather" in message:
+                    result = await pass_assistant._get_weather("Cairo")
+                    return {"reply": f"الطقس: {result}", "provider": "pass"}
+                result = await pass_assistant.create_task(req.user_id, message, "", "medium")
+                return {"reply": f"تم إنشاء المهمة: {result.get(task, {}).get(title, )}", "provider": "pass"}
+            except Exception as e: logger.warning(f"PASS fallback: {e}")
         elif any(kw in message for kw in DREAM_KEYWORDS):
             from app.features.dreams.dream_orchestrator import dream_orchestrator
             result = await dream_orchestrator.interpret(req.user_id, message, req.lang)

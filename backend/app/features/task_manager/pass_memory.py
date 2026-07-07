@@ -1,11 +1,11 @@
 """
-PASS MEMORY v1.1 – ذاكرة P.A.S.S. مع حفظ فعلي في History
-=============================================================
-- يحفظ المهام في TCMA
-- يحفظ تلقائياً في جدول projects (History)
+PASS MEMORY v1.0 – ذاكرة P.A.S.S. (TCMA + History)
+======================================================
+- تخزين المهام والعادات والملاحظات في TCMA
+- حفظ تلقائي في History
 """
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -15,43 +15,28 @@ class PASSMemory:
         self.memory_client = None
 
     async def save_task(self, user_id: str, task: Dict):
-        """حفظ المهمة في TCMA و History"""
         if self.memory_client:
             try:
-                # حفظ في TCMA
-                await self.memory_client.store_entity("pass_task", f"{user_id}_{task.get('id')}", {
-                    "user_id": user_id, "task_id": task["id"], "title": task["title"],
-                    "priority": task.get("priority"), "status": task.get("status"),
-                    "created_at": task.get("created_at"),
-                })
-                # حفظ في History (جدول projects)
-                await self.memory_client.store_entity("project", user_id, {
-                    "title": f"مهمة: {task.get('title', '')}",
-                    "type": "task",
-                    "data": task,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "user_id": user_id
-                })
-            except Exception as e:
-                logger.warning(f"Memory save failed: {e}")
+                await self.memory_client.store_entity("pass_task", f"{user_id}_{task.get('id')}", task)
+            except: pass
+        await self._save_to_history(user_id, f"مهمة: {task.get('title', '')}", "task", task)
 
     async def complete_task(self, user_id: str, task: Dict):
-        """تحديث المهمة كمكتملة في TCMA و History"""
         if self.memory_client:
             try:
                 task["status"] = "completed"
                 task["completed_at"] = datetime.now(timezone.utc).isoformat()
                 await self.memory_client.store_entity("pass_task", f"{user_id}_{task.get('id')}", task)
-                # تحديث في History
+            except: pass
+
+    async def _save_to_history(self, user_id: str, title: str, ptype: str, data: Dict):
+        if self.memory_client:
+            try:
                 await self.memory_client.store_entity("project", user_id, {
-                    "title": f"✅ تم: {task.get('title', '')}",
-                    "type": "task",
-                    "data": task,
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "user_id": user_id
+                    "title": title, "type": ptype, "data": data,
+                    "created_at": datetime.now(timezone.utc).isoformat(), "user_id": user_id
                 })
-            except Exception as e:
-                logger.warning(f"Memory complete failed: {e}")
+            except: pass
 
 
 pass_memory = PASSMemory()

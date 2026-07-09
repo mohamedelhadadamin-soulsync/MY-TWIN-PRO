@@ -3,6 +3,7 @@ import { livingIntelligence, AssembledContext } from './LivingIntelligence';
 import { EventBus } from './EventBus';
 import { emotionEngine } from '../../engine/emotion/EmotionEngine';
 import { relationshipEngine } from '../../engine/relationship/RelationshipEngine';
+import { consciousnessCoordinator, Decision } from '../coordinators/ConsciousnessCoordinator';
 
 export interface ThinkingPhase {
   phase: 'observe' | 'understand' | 'recall' | 'reason' | 'respond';
@@ -18,6 +19,7 @@ export interface BrainResponse {
   memoryStored: boolean;
   relationshipDelta: number;
   contextUsed: AssembledContext | null;
+  decision: Decision;
 }
 
 export interface PersonalityDNA {
@@ -81,15 +83,42 @@ Current Emotion: ${emotion}
   async process(message: string, history: Array<{ role: string; content: string }> = []): Promise<BrainResponse> {
     const phases: ThinkingPhase[] = [];
 
+    // المرحلة 1: ملاحظة
     this.emitThinking('observe', 0.0, 'يراقب...');
     phases.push({ phase: 'observe', progress: 1.0, label: 'يراقب...' });
 
+    // المرحلة 2: فهم
     this.emitThinking('understand', 0.25, 'يفهم...');
     await this.delay(200);
     phases.push({ phase: 'understand', progress: 1.0, label: 'يفهم...' });
 
+    // المرحلة 3: استدعاء ذاكرة + قرار الوعي
     this.emitThinking('recall', 0.5, 'يتذكر...');
     await this.delay(300);
+
+    // ═══════════════════════════════════════════════
+    // ✨ وعي حي – ConsciousnessCoordinator
+    // ═══════════════════════════════════════════════
+    const decision = await consciousnessCoordinator.decide(
+      message,
+      emotionEngine.getCurrentEmotion(),
+    );
+
+    // إذا كان القرار صمتًا، ننهي التفكير مبكرًا
+    if (decision.action === 'stay_silent') {
+      EventBus.emit('SILENCE_START', { level: 4, reason: decision.reason });
+      return {
+        reply: '',
+        provider: 'consciousness',
+        emotion: 'neutral',
+        thinkingPhases: [{ phase: 'respond', progress: 1.0, label: 'صامت' }],
+        memoryStored: false,
+        relationshipDelta: 0,
+        contextUsed: null,
+        decision,
+      };
+    }
+
     phases.push({ phase: 'recall', progress: 1.0, label: 'يتذكر...' });
 
     const context = livingIntelligence.getLastContext();
@@ -100,9 +129,33 @@ Current Emotion: ${emotion}
       });
     }
 
+    // إذا كان القرار ذكرى، نضيف نص التذكير إلى التاريخ
+    if (decision.action === 'respond_with_memory' && decision.memoryContent) {
+      history = [
+        { role: 'system', content: `Important memory: ${decision.memoryContent}` },
+        ...history,
+      ];
+    }
+
+    // إذا كان القرار اقتراح Workspace، نرسل حدثًا
+    if (decision.action === 'suggest_workspace' && decision.workspaceType) {
+      EventBus.emit('WORKSPACE_CHANGE_REQUESTED', {
+        workspace: decision.workspaceType,
+        confidence: 0.85,
+        trigger: 'consciousness',
+      });
+    }
+
+    // إذا كان check-in، نضبط النبرة
+    if (decision.action === 'check_in') {
+      history = [
+        { role: 'system', content: 'Use a warm, caring tone. This is a check-in.' },
+        ...history,
+      ];
+    }
+
     this.emitThinking('reason', 0.75, 'يفكر...');
 
-    // إضافة سياق الشخصية
     const personalityContext = this.buildPersonalityContext();
     const enrichedHistory = [...history];
     enrichedHistory.unshift({ role: 'system', content: personalityContext });
@@ -119,11 +172,14 @@ Current Emotion: ${emotion}
     phases.push({ phase: 'respond', progress: 1.0, label: 'يستجيب...' });
 
     return {
-      reply: result.reply, provider: result.provider,
+      reply: result.reply,
+      provider: result.provider,
       emotion: result.contextUsed.emotion.primaryEmotion,
-      thinkingPhases: phases, memoryStored: true,
+      thinkingPhases: phases,
+      memoryStored: true,
       relationshipDelta: result.relationshipDelta,
       contextUsed: result.contextUsed,
+      decision,
     };
   }
 

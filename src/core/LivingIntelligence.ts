@@ -10,6 +10,7 @@ import { personalityCoordinator } from '../coordinators/PersonalityCoordinator';
 import { growthCoordinator } from '../coordinators/GrowthCoordinator';
 import { selfAwarenessCoordinator } from '../coordinators/SelfAwarenessCoordinator';
 import { goalCoordinator } from '../coordinators/GoalCoordinator';
+import { dailyLifeController } from '../world/DailyLifeController';
 
 interface EmotionalState {
   primaryEmotion: string; intensity: number;
@@ -62,6 +63,11 @@ export class LivingIntelligence {
     await continuityCoordinator.initialize(userId);
     await personalityCoordinator.generateDNA(userId);
 
+    // ═══════════════════════════════════════════════
+    // ✨ بدء الحياة اليومية
+    // ═══════════════════════════════════════════════
+    dailyLifeController.start();
+
     this.startRuntimeLoop();
     this.assembleContext();
     EventBus.emit('PRESENCE_CHANGED', { from: 0, to: 1, trigger: 'intelligence_start' });
@@ -69,6 +75,7 @@ export class LivingIntelligence {
 
   stop(): void {
     this.state.isActive = false;
+    dailyLifeController.stop();
     if (this.runtimeInterval) { clearInterval(this.runtimeInterval); this.runtimeInterval = null; }
   }
 
@@ -148,8 +155,6 @@ export class LivingIntelligence {
       if (secondsSinceLastInteraction > 3600 && this.state.energyLevel < 0.2) {
         StateBus.update({ presenceLevel: 0, interfaceState: 'dormant' });
       }
-
-      // تشغيل المنسقين الدوريين كل دقيقة
       if (Math.floor(now / 60000) !== Math.floor((now - 1000) / 60000)) {
         presenceCoordinator.generateCheckIn();
         selfAwarenessCoordinator.reflect();

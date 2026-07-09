@@ -23,6 +23,7 @@ const WORLD_TRANSITIONS: Record<WorldState, TransitionConfig> = {
   creative: { color: '#100818', duration: 700, label: 'عالم الإبداع' },
   life:     { color: '#081810', duration: 800, label: 'عالم الحياة' },
   code:     { color: '#080C18', duration: 600, label: 'عالم البرمجة' },
+  code_lab: { color: '#060A0E', duration: 600, label: 'Developer Lab' },
 };
 
 export default function WorldTransition({ children }: { children: React.ReactNode }) {

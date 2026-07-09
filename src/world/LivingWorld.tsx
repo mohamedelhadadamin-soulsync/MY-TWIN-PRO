@@ -11,6 +11,7 @@ import { storeSyncBridge } from '../core/StoreSyncBridge';
 import { EventBus } from '../core/EventBus';
 import { getGreeting } from '../utils/languageDetector';
 import { useRTL } from '../utils/useRTL';
+import { capabilityResolver } from '../coordinators/CapabilityResolver';
 import BirthSequence from '../renderers/zones/BirthSequence';
 import GreetingWord from '../renderers/zones/GreetingWord';
 import ThinkingIndicator from '../renderers/zones/ThinkingIndicator';
@@ -24,6 +25,8 @@ import ContextOverlay from './ContextOverlay';
 import WorkspacePortal from './WorkspacePortal';
 import SoulPulseRing from './SoulPulseRing';
 import WorldTransition from './WorldTransition';
+import StudyCapability from './StudyCapability';
+import DeveloperLabCapability from './DeveloperLabCapability';
 import { SPACE, RADIUS } from '../../src/design/tokens/spacing';
 
 interface LivingWorldProps { userId: string; }
@@ -77,6 +80,15 @@ export default function LivingWorld({ userId }: LivingWorldProps) {
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || isThinking) return;
     const text = inputText.trim();
+
+    // ═══════════════════════════════════════════════
+    // ✨ Capability Resolver — يقرر أي قدرة تناسب
+    // ═══════════════════════════════════════════════
+    const resolved = capabilityResolver.resolve(text);
+    if (resolved.capability !== 'general' && resolved.confidence > 0.5) {
+      capabilityResolver.activate(resolved.capability);
+    }
+
     setInputText('');
     setMessages(prev => [...prev, { id: Date.now().toString(), sender: 'user' as const, text }]);
     EventBus.emit('USER_SEND_MESSAGE', { message: text, timestamp: Date.now() });
@@ -104,16 +116,10 @@ export default function LivingWorld({ userId }: LivingWorldProps) {
     <WorldTransition>
       <TouchableWithoutFeedback onPress={handleFirstInteraction}>
         <View style={styles.container}>
-          {/* Ambient Layer */}
           <AmbientField />
-
-          {/* Soul Pulse Ring */}
           <SoulPulseRing />
-
-          {/* Connection Field (relationship particles) */}
           <ConnectionField visible={bond.bondLevel >= 2} />
 
-          {/* Twin Presence Zone */}
           {awakening.breathVisible && (
             <TwinPresenceZone
               memoryEchoVisible={memoryEchoVisible}
@@ -122,10 +128,16 @@ export default function LivingWorld({ userId }: LivingWorldProps) {
             />
           )}
 
-          {/* Context Overlay */}
           <ContextOverlay />
 
-          {/* Conversation */}
+          {/* ═══════════════════════════════════════════ */}
+          {/* ✨ F1 — Study Capability */}
+          {/* ═══════════════════════════════════════════ */}
+          <View style={styles.capabilityContainer}>
+            <StudyCapability />
+          <DeveloperLabCapability />
+          </View>
+
           <View style={styles.conversationContainer}>
             {showGreeting && !greetingDone && (
               <GreetingWord
@@ -147,17 +159,14 @@ export default function LivingWorld({ userId }: LivingWorldProps) {
             <SilencePresence />
           </View>
 
-          {/* Workspace Portal */}
           <View style={styles.portalContainer}>
             <WorkspacePortal />
           </View>
 
-          {/* Memory Ribbon */}
           <View style={styles.memoryContainer}>
             <MemoryRibbon userId={userId} maxCards={2} />
           </View>
 
-          {/* Input */}
           {showInput && (
             <View style={styles.inputContainer}>
               <TextInput
@@ -170,7 +179,6 @@ export default function LivingWorld({ userId }: LivingWorldProps) {
             </View>
           )}
 
-          {/* Signature Moments Overlay */}
           <SignatureMomentOverlay />
         </View>
       </TouchableWithoutFeedback>
@@ -180,6 +188,9 @@ export default function LivingWorld({ userId }: LivingWorldProps) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#050510' },
+  capabilityContainer: {
+    position: 'absolute', top: 100, left: 0, right: 0, zIndex: 15,
+  },
   conversationContainer: {
     position: 'absolute', bottom: 280, left: SPACE.lg, right: SPACE.lg,
     alignItems: 'center', zIndex: 15,

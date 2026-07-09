@@ -7,3 +7,7 @@ export { PresenceCoordinator, presenceCoordinator } from './PresenceCoordinator'
 export { TimelineCoordinator, timelineCoordinator } from './TimelineCoordinator';
 export { SelfAwarenessCoordinator, selfAwarenessCoordinator } from './SelfAwarenessCoordinator';
 export { ContinuityCoordinator, continuityCoordinator } from './ContinuityCoordinator';
+export { ConsciousnessCoordinator, consciousnessCoordinator } from './ConsciousnessCoordinator';
+export type { Decision, DecisionAction } from './ConsciousnessCoordinator';
+export { CapabilityResolver, capabilityResolver } from './CapabilityResolver';
+export type { CapabilityType } from './CapabilityResolver';

@@ -24,6 +24,7 @@ import TwinPresenceZone from './TwinPresenceZone';
 import ContextOverlay from './ContextOverlay';
 import WorkspacePortal from './WorkspacePortal';
 import SoulPulseRing from './SoulPulseRing';
+import SoulObservatory from './SoulObservatory/SoulObservatory';
 import WorldTransition from './WorldTransition';
 import StudyCapability from './StudyCapability';
 import DeveloperLabCapability from './DeveloperLabCapability';
@@ -40,6 +41,7 @@ import SessionSurface from './SessionSurface';
 import LivingTimeline from './LivingTimeline';
 import MemoryForest from './MemoryForest';
 import SoulPulse from '../renderers/zones/SoulPulse';
+import SoulObservatory from './SoulObservatory/SoulObservatory';
 import { SPACE, RADIUS } from '../../src/design/tokens/spacing';
 
 interface LivingWorldProps { userId: string; }
@@ -132,10 +134,12 @@ export default function LivingWorld({ userId }: LivingWorldProps) {
           <AmbientField />
           <SoulPulseRing />
           <SoulPulse />
+          <SoulObservatory />
           <ConnectionField visible={bond.bondLevel >= 2} />
 
           {awakening.breathVisible && (
             <TwinPresenceZone
+            onLongPress={() => EventBus.emit('OPEN_SOUL_OBSERVATORY')}
               memoryEchoVisible={memoryEchoVisible}
               echoColor={echoColor}
               awakeningEyesOpen={awakening.eyesOpen}

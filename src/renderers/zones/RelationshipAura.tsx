@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withRepeat, Easing } from 'react-native-reanimated';
 import { relationshipEngine } from '../../../engine/relationship/RelationshipEngine';
-import { stateBus, STATE_EVENTS } from '../../../engine/core/StateBus';
+import { stateBus, STATE_EVENTS } from '../../../src/core/StateBus';
 
 interface RelationshipAuraProps {
   size?: number;

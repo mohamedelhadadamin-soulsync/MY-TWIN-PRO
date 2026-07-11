@@ -1,92 +1,75 @@
 {
   "expo": {
-    "name": "MyTwin",
+    "name": "My Twin",
     "slug": "my-twin",
-    "scheme": "mytwin",
-    "version": "16.0.0",
+    "owner": "soulsync.c",
+    "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/brand/icon.png",
+    "scheme": "mytwin",
+    "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0014"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.soulsync.mytwin",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "يحتاج التطبيق للميكروفون للمحادثات الصوتية.",
-        "NSCameraUsageDescription": "للسماح لك بإرسال الصور إلى توأمك",
-        "NSPhotoLibraryUsageDescription": "للسماح لك بمشاركة الصور مع توأمك",
-        "NSLocationWhenInUseUsageDescription": "يستخدم الموقع لتحسين تجربة التوأم.",
-        "ITSAppUsesNonExemptEncryption": false,
-        "GADApplicationIdentifier": "ca-app-pub-3940256099942544~1458002511"
+        "NSMicrophoneUsageDescription": "يحتاج التوأم إلى الميكروفون ليستمع إليك عندما تتحدث.",
+        "NSSpeechRecognitionUsageDescription": "يستخدم التوأم التعرف على الصوت لتحويل كلامك إلى نص."
       }
     },
     "android": {
-      "package": "com.soulsync.mytwin",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/brand/adaptive-icon.png",
         "backgroundColor": "#0A0014"
       },
+      "package": "com.soulsync.mytwin",
       "permissions": [
-        "CAMERA",
-        "RECORD_AUDIO",
         "INTERNET",
-        "VIBRATE",
-        "ACCESS_FINE_LOCATION",
-        "RECEIVE_BOOT_COMPLETED",
-        "POST_NOTIFICATIONS",
-        "com.android.vending.BILLING",
-        "com.google.android.gms.permission.AD_ID"
+        "ACCESS_NETWORK_STATE",
+        "RECORD_AUDIO",
+        "VIBRATE"
       ]
     },
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#7C3AED"
-    },
     "plugins": [
-      "expo-router",
-      "expo-font",
-      [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
-        }
-      ],
+      "expo-localization",
       [
         "expo-build-properties",
         {
           "android": {
-            "newArchEnabled": false,
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
             "minSdkVersion": 24
           },
           "ios": {
-            "newArchEnabled": false,
-            "useFrameworks": "static"
+            "deploymentTarget": "15.0"
           }
         }
       ],
       [
-        "expo-notifications",
+        "react-native-google-mobile-ads",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#7C3AED"
+          "androidAppId": "ca-app-pub-xxxxxxxxxxxxxxxx~xxxxxxxxxx",
+          "iosAppId": "ca-app-pub-xxxxxxxxxxxxxxxx~xxxxxxxxxx",
+          "userTrackingUsageDescription": "يستخدم هذا المعرف لتقديم إعلانات مخصصة.",
+          "delayAppMeasurement": true
         }
       ]
     ],
     "extra": {
-      "router": { "origin": false },
-      "eas": { "projectId": "6cb78668-322b-476f-ab25-4136d85f8d68" },
-      "cli": { "appVersionSource": "local" }
-    },
-    "owner": "soulsync.c",
-    "sdkVersion": "52.0.0",
-    "jsEngine": "hermes"
+      "eas": {
+        "projectId": "6cb78668-322b-476f-ab25-4136d85f8d68"
+      },
+      "REWARDED_AD_UNIT_ID_ANDROID": "ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx",
+      "REWARDED_AD_UNIT_ID_IOS": "ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx",
+      "API_URL": "https://my-twin-pro-production-b744.up.railway.app",
+      "ENVIRONMENT": "production"
+    }
   }
 }

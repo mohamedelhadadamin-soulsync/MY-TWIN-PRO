@@ -44,18 +44,6 @@ except Exception as e:
     RATE_LIMIT_AVAILABLE = False
 
 # ════════════════════════════════════════════════════════════════
-# دالة تهيئة آمنة – تسجل الخطأ وتكمل بدلاً من الانهيار
-# ════════════════════════════════════════════════════════════════
-async def _safe_init(name: str, coro):
-    try:
-        result = await coro if hasattr(coro, '__await__') else coro
-        logger.info(f"   ✅ {name} initialized")
-        return result
-    except Exception as e:
-        logger.warning(f"   ⚠️ {name} failed (non-fatal): {e}")
-        return None
-
-# ════════════════════════════════════════════════════════════════
 # Lifespan
 # ════════════════════════════════════════════════════════════════
 @asynccontextmanager
@@ -63,24 +51,20 @@ async def lifespan(app: FastAPI):
     logger.info("🌟 Initializing all systems...")
 
     # AI Gateway – إلزامي
-    ai_gateway = None
     try:
         from app.infrastructure.ai.ai_gateway import ai_gateway as _ag
-        ai_gateway = _ag
         logger.info("   ✅ AI Gateway initialized")
     except Exception as e:
         logger.error(f"   ❌ AI Gateway FAILED: {e}")
 
     # Memory Client – اختياري
-    memory_client = None
     try:
         from app.infrastructure.database.memory_repo import memory_repo
-        memory_client = memory_repo
         logger.info("   ✅ Memory Client initialized")
     except Exception as e:
         logger.warning(f"   ⚠️ Memory Client unavailable: {e}")
 
-    # الأنظمة الاختيارية – فشل أي منها لا يوقف الخادم
+    # الأنظمة الاختيارية
     optional_systems = [
         ("Twin Brain",            "app.twin_brain.brain_orchestrator",        "twin_brain",            True),
         ("Twin Internal State",   "app.twin_state.internal_state",            "twin_internal_state",   False),
@@ -108,53 +92,10 @@ async def lifespan(app: FastAPI):
     # Proactive Awareness
     try:
         from app.features.proactive_awareness import proactive_awareness
-        await proactive_awareness.initialize(ai_gateway=ai_gateway, memory_client=memory_client)
         await proactive_awareness.start()
         logger.info("   ✅ Proactive Awareness started")
     except Exception as e:
         logger.warning(f"   ⚠️ Proactive Awareness skipped: {e}")
-
-    # Avatar Engine
-    try:
-        from app.features.avatar_engine.avatar_engine import avatar_engine
-        await avatar_engine.initialize(ai_gateway=ai_gateway, memory_client=memory_client)
-        logger.info("   ✅ Avatar Engine initialized")
-    except Exception as e:
-        logger.warning(f"   ⚠️ Avatar Engine skipped: {e}")
-
-    # Digital Fingerprint
-    try:
-        from app.features.digital_fingerprint import fingerprint_engine
-        await fingerprint_engine.initialize(ai_gateway=ai_gateway, memory_client=memory_client)
-        logger.info("   ✅ Digital Fingerprint initialized")
-    except Exception as e:
-        logger.warning(f"   ⚠️ Digital Fingerprint skipped: {e}")
-
-    # Digital Twin Sync
-    try:
-        from app.features.digital_twin_sync import digital_twin_sync
-        await digital_twin_sync.initialize(ai_gateway=ai_gateway, memory_client=memory_client)
-        logger.info("   ✅ Digital Twin Sync initialized")
-    except Exception as e:
-        logger.warning(f"   ⚠️ Digital Twin Sync skipped: {e}")
-
-    # Consciousness Bridge
-    try:
-        from app.core.consciousness_bridge import consciousness_bridge
-        await consciousness_bridge.initialize(ai_gateway=ai_gateway, memory_client=memory_client)
-        logger.info("   ✅ Consciousness Bridge initialized")
-    except Exception as e:
-        logger.warning(f"   ⚠️ Consciousness Bridge skipped: {e}")
-
-    # Feature Registry
-    try:
-        from app.core.feature_registry import feature_registry
-        await feature_registry.initialize(ai_gateway=ai_gateway, memory_client=memory_client)
-        feature_registry.register_routes(app)
-        total = len(feature_registry.get_all_plugins())
-        logger.info(f"   ✅ Feature Registry: {total} plugins loaded")
-    except Exception as e:
-        logger.warning(f"   ⚠️ Feature Registry skipped: {e}")
 
     # Core Routes
     _register_core_routes(app)
@@ -164,12 +105,6 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("👋 Shutting down...")
-    try:
-        from app.core.feature_registry import feature_registry
-        for _, plugin in feature_registry.get_all_plugins().items():
-            try: await plugin.shutdown()
-            except: pass
-    except: pass
     logger.info("👋 MyTwin API shut down cleanly")
 
 
@@ -178,40 +113,63 @@ async def lifespan(app: FastAPI):
 # ════════════════════════════════════════════════════════════════
 def _register_core_routes(app: FastAPI):
     core_modules = [
+        # المحادثة والذكاء
         "app.api.routes.chat",
+        "app.api.routes.twin_state_routes",
+        "app.api.routes.consciousness_routes",
+        "app.api.routes.awareness_routes",
+        "app.api.routes.awareness_score_routes",
+
+        # المصادقة والحساب
         "app.api.routes.auth",
+        "app.api.routes.account",
         "app.api.routes.profile",
+        "app.api.routes.onboarding",
+
+        # الذاكرة والعلاقات
         "app.api.routes.memories",
+        "app.api.routes.relationship",
+        "app.api.routes.relationship_economy_routes",
+        "app.api.routes.graph_routes",
+
+        # القدرات
+        "app.api.routes.study_routes",
+        "app.api.routes.code_lab_routes",
+        "app.api.routes.business_routes",
+        "app.api.routes.creator_routes",
+        "app.api.routes.image_lab_routes",
+        "app.api.routes.dream_routes",
+        "app.api.routes.life_coach_routes",
+        "app.api.routes.task_manager_routes",
+        "app.api.routes.smart_home_routes",
+
+        # الصوت
+        "app.api.routes.tts",
+        "app.api.routes.stt_routes",
+
+        # الاقتصاد
+        "app.api.routes.billing",
+        "app.api.routes.ads",
+        "app.api.routes.referral",
+        "app.api.routes.economy_routes",   # 🆕 Soul Points API
+
+        # النظام
         "app.api.routes.goals",
         "app.api.routes.feedback",
-        "app.api.routes.referral",
-        "app.api.routes.onboarding",
-        "app.api.routes.account",
         "app.api.routes.push",
-        "app.api.routes.ads",
         "app.api.routes.stats",
-        "app.api.routes.dev",
-        "app.api.routes.admin",
-        "app.api.routes.billing",
         "app.api.routes.reports",
-        "app.api.routes.graph_routes",
         "app.api.routes.recommendations",
         "app.api.routes.meta_routes",
-        "app.api.routes.relationship",
         "app.api.routes.ai_trainer_routes",
-        "app.infrastructure.integrations.telegram_webhook",
-        "app.api.routes.awareness_routes",
         "app.api.routes.avatar_routes",
-        "app.api.routes.task_manager_routes",
         "app.api.routes.fingerprint_routes",
-        "app.api.routes.image_routes",
         "app.api.routes.sync_routes",
-        "app.api.routes.consciousness_routes",
-        "app.api.routes.tts",
-        "app.api.routes.awareness_score_routes",
-        "app.api.routes.twin_state_routes",
-        "app.api.routes.relationship_economy_routes",
+
+        # تكاملات
+        "app.infrastructure.integrations.telegram_webhook",
     ]
+
     loaded = 0
     for module_path in core_modules:
         try:
@@ -223,6 +181,7 @@ def _register_core_routes(app: FastAPI):
                 logger.warning(f"   ⚠️ No router in '{module_path}'")
         except Exception as e:
             logger.warning(f"   ⚠️ Route '{module_path}' skipped: {e}")
+
     logger.info(f"   ✅ {loaded}/{len(core_modules)} core routes loaded")
 
 
@@ -250,7 +209,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate Limit Middleware – فقط إذا كان متاحاً
+# Rate Limit Middleware
 if RATE_LIMIT_AVAILABLE:
     app.add_middleware(RateLimitMiddleware)
     logger.info("✅ RateLimitMiddleware active")
@@ -271,32 +230,18 @@ async def log_requests(request: Request, call_next):
 # ════════════════════════════════════════════════════════════════
 @app.get("/")
 async def root():
-    try:
-        from app.core.feature_registry import feature_registry
-        plugins = feature_registry.list_plugins() if feature_registry.is_initialized else []
-    except:
-        plugins = []
     return {
-        "name":            "MyTwin API",
-        "version":         "18.0.0",
-        "status":          "running",
-        "plugins_loaded":  len(plugins),
-        "twin_os_kernel":  True,
+        "name":    "MyTwin API",
+        "version": "18.0.0",
+        "status":  "running",
+        "twin_os_kernel": True,
     }
 
 @app.get("/health")
 async def health():
-    plugins_health = {}
-    try:
-        from app.core.feature_registry import feature_registry
-        if feature_registry.is_initialized:
-            plugins_health = await feature_registry.health_check_all()
-    except:
-        pass
     return JSONResponse(content={
         "api":            "healthy",
         "twin_os_kernel": True,
-        "plugins":        plugins_health,
     })
 
 if __name__ == "__main__":

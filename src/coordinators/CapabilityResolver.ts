@@ -1,4 +1,5 @@
 import { EventBus } from '../core/EventBus';
+import { capabilityGate } from '../../services/CapabilityGate';
 
 /**
  * أنواع القدرات المدعومة
@@ -111,6 +112,11 @@ export class CapabilityResolver {
   /**
    * تفعيل قدرة — يصدر حدث تحويل العالم.
    */
+  /** التحقق من توفر القدرة قبل التفعيل */
+  canActivate(capability: CapabilityType): boolean {
+    if (capability === 'general') return true;
+    return capabilityGate.isCapabilityAvailable(capability);
+  }
   activate(capability: CapabilityType): void {
     if (capability === 'general') return;
 

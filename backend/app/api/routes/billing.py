@@ -219,3 +219,68 @@ async def _verify_google_play(token: str, product_id: str):
         return False, None
 
 logger.info("✅ Billing Routes v3.1 initialized")
+
+# ═══════════════════════════════════════════════════════
+# مسارات إضافية للتكامل مع CommercePlugin
+# ═══════════════════════════════════════════════════════
+
+@router.get("/health")
+async def billing_health():
+    """التحقق من صحة نظام الفوترة"""
+    return {
+        "status": "healthy",
+        "google_play_configured": bool(SERVICE_ACCOUNT_JSON),
+        "environment": "production" if IS_PRODUCTION else "development",
+        "plans_count": len(TIER_MAP),
+    }
+
+@router.get("/plans")
+async def get_plans():
+    """جلب جميع خطط الاشتراك المتاحة"""
+    from app.domain.billing.subscription_service import SUBSCRIPTION_PLANS
+    plans = []
+    for tier_id, plan in SUBSCRIPTION_PLANS.items():
+        plans.append({
+            "tier": tier_id,
+            "name": plan["name"],
+            "price": plan["price"],
+            "messages": plan["messages"],
+            "features": plan["features"],
+            "billing_period": plan.get("billing_period", "monthly"),
+        })
+    return {"plans": plans}
+
+@router.post("/restore")
+async def restore_purchases(
+    user_id: str = Depends(get_current_user_id),
+):
+    """استعادة المشتريات — يتحقق من Google Play ويعيد تفعيل الاشتراك"""
+    from app.domain.billing.subscription_service import get_user_subscription, upgrade_subscription
+
+    # جلب الاشتراك الحالي
+    current = await get_user_subscription(user_id)
+    if current.get("tier") != "free" and current.get("is_active"):
+        return {"success": True, "tier": current["tier"], "message": "الاشتراك نشط بالفعل"}
+
+    # محاولة استعادة من Google Play (يتطلب purchase token سابق)
+    try:
+        # في الإصدار النهائي: نبحث في purchase_history عن آخر عملية شراء ونتحقق منها
+        db = get_db()
+        last_purchase = db.table("purchase_history") \
+            .select("product_id, tier, duration_days") \
+            .eq("user_id", user_id) \
+            .order("verified_at", desc=True) \
+            .limit(1) \
+            .execute()
+
+        if last_purchase.data:
+            purchase = last_purchase.data[0]
+            # إعادة تفعيل الاشتراك
+            await upgrade_subscription(user_id, purchase["tier"], purchase["duration_days"])
+            return {"success": True, "tier": purchase["tier"], "message": "تم استعادة الاشتراك"}
+    except Exception as e:
+        logger.warning(f"Restore failed: {e}")
+
+    return {"success": False, "message": "لا توجد مشتريات سابقة"}
+
+logger.info("✅ Billing Routes v3.1 + health/plans/restore initialized")

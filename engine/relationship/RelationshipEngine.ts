@@ -1,5 +1,5 @@
-import { stateBus, STATE_EVENTS } from '../core/StateBus';
-import { useTwinState } from '../core/TwinState';
+import { stateBus, STATE_EVENTS } from '../../src/core/StateBus';
+import { useTwinState } from '../../src/core/TwinState';
 
 type RelationshipPhase = 'stranger' | 'acquaintance' | 'friend' | 'close_friend' | 'soulmate';
 interface BondMetrics { trust: number; intimacy: number; consistency: number; shared_experiences: number; }
@@ -17,7 +17,7 @@ export class RelationshipEngine {
   private trustBreaches: number = 0;
   private bondVelocity: number = 0;
   private greetingStyle: 'formal' | 'friendly' | 'warm' | 'intimate' | 'deep' = 'formal';
-  private initiativeLevel: number = 0.2; // 0-1: مدى مبادرة التوأم
+  private initiativeLevel: number = 0.2;
 
   setMemoryClient(client: any): void { this.memoryClient = client; this.loadFromMemory(); }
 
@@ -63,7 +63,6 @@ export class RelationshipEngine {
       });
     }
     
-    // J9 — تحديث السلوك حسب المرحلة
     this.updateBehavioralStyle();
     
     useTwinState.getState().setBondLevel(Math.round(avg));
@@ -71,7 +70,37 @@ export class RelationshipEngine {
     await this.saveToMemory();
   }
 
-  // J9 — تحديث أسلوب السلوك بناءً على المرحلة
+  // 🆕 استقبال تحديث من الخلفية
+  applyBackendUpdate(update: { bondLevel: number; phase: string; trust: number; trend: string }): void {
+    const oldPhase = this.phase;
+    this.metrics.trust = update.trust;
+    if (update.phase && update.phase !== this.phase) {
+      const validPhases: RelationshipPhase[] = ['stranger', 'acquaintance', 'friend', 'close_friend', 'soulmate'];
+      if (validPhases.includes(update.phase as RelationshipPhase)) {
+        this.phase = update.phase as RelationshipPhase;
+        this.updateBehavioralStyle();
+        if (!this.chapters.find(c => c.phase === this.phase)) {
+          this.chapters.push({
+            title: this.getChapterTitle(this.phase),
+            phase: this.phase,
+            startedAt: new Date().toISOString(),
+            bondAtStart: update.bondLevel,
+          });
+        }
+      }
+    }
+    const avg = (this.metrics.trust + this.metrics.intimacy + this.metrics.consistency + this.metrics.shared_experiences) / 4;
+    useTwinState.getState().setBondLevel(Math.round(avg));
+    stateBus.emit(STATE_EVENTS.BOND_CHANGED, { 
+      phase: this.phase, 
+      metrics: this.metrics, 
+      bondLevel: Math.round(avg),
+      backendSync: true 
+    });
+    this.saveToMemory();
+    console.log(`[RelationshipEngine] تم تطبيق تحديث الخلفية: ثقة=${update.trust}, مرحلة=${this.phase}`);
+  }
+
   private updateBehavioralStyle(): void {
     const phaseStyles: Record<RelationshipPhase, { greeting: typeof this.greetingStyle; initiative: number }> = {
       stranger:     { greeting: 'formal',   initiative: 0.15 },
@@ -109,7 +138,6 @@ export class RelationshipEngine {
   getPhase(): RelationshipPhase { return this.phase; }
   getMetrics(): BondMetrics { return { ...this.metrics }; }
 
-  // J9 — دوال السلوك الجديدة
   getGreetingStyle(): string { return this.greetingStyle; }
   getInitiativeLevel(): number { return this.initiativeLevel; }
   

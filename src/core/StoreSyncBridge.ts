@@ -20,7 +20,7 @@
 import { StateBus, PresenceLevel, InterfaceState, EmotionalState } from './StateBus';
 import { EventBus } from './EventBus';
 import { useTwinState, ConsciousnessMode, Emotion } from '../../engine/core/TwinState';
-import { stateBus, STATE_EVENTS } from '../../engine/core/StateBus';
+import { stateBus, STATE_EVENTS } from '../../src/core/StateBus';
 import { emotionEngine } from '../../engine/emotion/EmotionEngine';
 
 // ═══════════════════════════════════════════════════════

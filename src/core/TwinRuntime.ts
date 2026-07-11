@@ -67,6 +67,8 @@ export class TwinRuntime {
     if (this.status === 'running') return;
 
     this.uptimeStart = Date.now();
+    // تهيئة الاشتراك للمستخدم
+    subscriptionService.initialize(userId).catch(console.warn);
     this.status = 'running';
 
     // Transition from Dormant to Aware

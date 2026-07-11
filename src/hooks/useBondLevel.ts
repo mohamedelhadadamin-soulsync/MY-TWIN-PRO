@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRelationshipStore } from '../../store/useRelationshipStore';
-import { stateBus, STATE_EVENTS } from '../../engine/core/StateBus';
+import { stateBus, STATE_EVENTS } from '../../src/core/StateBus';
 
 interface BondInfo {
   bondLevel: number;       // 0 – 5 (الجديد)

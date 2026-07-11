@@ -1,0 +1,16 @@
+export { CommercePlugin, commercePlugin } from './CommercePlugin';
+export type { PlanTier, PlanInfo, PurchaseResult } from './CommercePlugin';
+export { SubscriptionService, subscriptionService } from './SubscriptionService';
+export { AdService, adService } from './AdService';
+export type { AdStatus, AdReward } from './AdService';
+export { RewardedAdService } from './RewardedAdService';
+export { CapabilityGate, capabilityGate } from './CapabilityGate';
+export { pluginRegistry } from './PluginClient';
+export type { PluginInfo } from './PluginClient';
+export { ReferralService, referralService } from './ReferralService';
+export type { ReferralStats, ReferralReward } from './ReferralService';
+export { AchievementEconomy, achievementEconomy } from './AchievementEconomy';
+export type { Achievement } from './AchievementEconomy';
+export { SurpriseRewards, surpriseRewards } from './SurpriseRewards';
+export { EconomyEngine, economyEngine } from './EconomyEngine';
+export type { SoulPointsBalance, SoulPointTransaction } from './EconomyEngine';

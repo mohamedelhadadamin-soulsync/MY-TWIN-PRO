@@ -1,75 +1,23 @@
 {
-  "cli": {
-    "version": ">= 14.0.0",
-    "appVersionSource": "local"
-  },
+  "cli": { "version": ">= 3.0.0" },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug"
-      },
-      "env": {
-        "APP_VARIANT": "development"
-      }
+      "distribution": "internal"
     },
     "preview": {
       "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "simulator": false,
-        "buildConfiguration": "Release"
-      },
-      "channel": "preview",
-      "env": {
-        "APP_VARIANT": "preview",
-        "ENVIRONMENT": "preview"
-      }
+      "android": { "buildType": "apk" }
     },
     "production": {
-      "distribution": "store",
-      "autoIncrement": true,
-      "android": {
-        "buildType": "app-bundle"
-      },
-      "ios": {
-        "autoIncrement": true,
-        "buildConfiguration": "Release"
-      },
-      "channel": "production",
-      "env": {
-        "APP_VARIANT": "production",
-        "ENVIRONMENT": "production"
-      }
-    },
-    "staging": {
-      "distribution": "internal",
-      "autoIncrement": true,
-      "android": {
-        "buildType": "apk"
-      },
-      "channel": "staging",
-      "env": {
-        "APP_VARIANT": "staging",
-        "ENVIRONMENT": "staging"
-      }
+      "android": { "buildType": "app-bundle" },
+      "ios": { "autoIncrement": true }
     }
   },
   "submit": {
     "production": {
-      "android": {
-        "track": "internal",
-        "releaseStatus": "draft"
-      },
-      "ios": {
-        "appleId": "your-apple-id@email.com",
-        "ascAppId": "xxxxxxxxx",
-        "appleTeamId": "xxxxxxxxx"
-      }
+      "android": { "track": "production" },
+      "ios": { "appleId": "soulsync.c@gmail.com" }
     }
   }
 }

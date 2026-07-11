@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withRepeat, Easing } from 'react-native-reanimated';
 import { useTwinState } from '../../../engine/core/TwinState';
-import { stateBus, STATE_EVENTS } from '../../../engine/core/StateBus';
+import { stateBus, STATE_EVENTS } from '../../../src/core/StateBus';
 import { twinBrain } from '../../core/TwinBrain';
 import { LivingIntelligence } from '../../core/LivingIntelligence';
 import { RADIUS } from '../../../src/design/tokens/spacing';
